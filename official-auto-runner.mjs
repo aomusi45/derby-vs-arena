@@ -42,9 +42,35 @@ export async function executeInChromium({engineHtml,prepared,timeoutMs=240000,ch
     let stage='load-html';
     try {
     await page.goto(pathToFileURL(resolve(engineHtml)).href,{waitUntil:'domcontentloaded',timeout:90000});
-    await page.evaluate(()=>window.__df47Start3D?.());
+    // Official worker only: bypass the two visual entry screens. Do not
+    // change the game's normal opening flow, race rules, or VS unlock checks.
+    stage='wait-start-function';
+    await page.waitForFunction(
+      ()=>typeof window.__df47Start3D==='function',
+      null,
+      {timeout:120000}
+    );
+    stage='direct-engine-boot';
+    await page.evaluate(()=>{
+      // This is the same request flag used by the opening button; it is not
+      // a farm-screen or race-ready spoof. main() still performs real setup.
+      window.__df46OpeningRequested=true;
+      window.__df47Start3D();
+    });
     stage='wait-engine-ready';
-    await page.waitForFunction(()=>window.__raceReady3D===true,null,{timeout:120000});
+    await page.waitForFunction(()=>{
+      if(window.__df47BootError) throw Error(String(window.__df47BootError).slice(0,800));
+      return window.__raceReady3D===true;
+    },null,{timeout:120000});
+    stage='verify-farm-initialized';
+    const farmBoot=await page.evaluate(()=>({
+      ready:window.__raceReady3D===true,
+      screen:document.body?.dataset?.gameScreen??null,
+      engine:typeof window.DFV30SharedRace?.start==='function'
+    }));
+    if(!farmBoot.ready || !farmBoot.engine || farmBoot.screen!=='farm'){
+      throw Error(`牧場の初期化が完了していません: ${JSON.stringify(farmBoot)}`);
+    }
     stage='start-race';
     const launched=await page.evaluate(({field,distance,going})=>{
       const engine=window.DFV30SharedRace;
