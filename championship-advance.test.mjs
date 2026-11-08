@@ -1,0 +1,15 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {planChampionshipDecider} from './championship-decider.mjs';
+import {planDeciderFinal,resolveChampionshipFinal} from './championship-advance.mjs';
+const plan=planChampionshipDecider({weekKey:'20261102',entrants:Array.from({length:19},(_,i)=>`h${i}`),sundayArimaFinishedAt:'2026-11-08T12:00:00Z'});
+const [a,b]=plan.heats;
+const result=(h,finish)=>({id:h.id,status:'finished',finishedAt:finish,results:h.entrantSnapshotIds.map((id,i)=>({rank:i+1,snapshotId:id}))});
+const finished=[result(a,'2026-11-08T12:45:00Z'),result(b,'2026-11-08T12:50:00Z')];
+test('全予選完了後、最後の終了から5分で決勝',()=>{const f=planDeciderFinal({weekKey:plan.weekKey,heats:plan.heats,completedHeats:finished});assert.equal(f.scheduledAt.toISOString(),'2026-11-08T12:55:00.000Z');assert.deepEqual(f.entrantSnapshotIds,[a.entrantSnapshotIds[0],b.entrantSnapshotIds[0]]);});
+test('予選未完了なら決勝を作らない',()=>assert.throws(()=>planDeciderFinal({weekKey:plan.weekKey,heats:plan.heats,completedHeats:[finished[0]]}),/終了/));
+test('予選結果に登録外の馬がいれば拒否',()=>assert.throws(()=>planDeciderFinal({weekKey:plan.weekKey,heats:plan.heats,completedHeats:[{...finished[0],results:[{rank:1,snapshotId:'X'},...finished[0].results.slice(1)]},finished[1]]}),/不正/));
+test('同一予選の重複結果を拒否',()=>assert.throws(()=>planDeciderFinal({weekKey:plan.weekKey,heats:plan.heats,completedHeats:[finished[0],finished[0]]}),/重複/));
+test('終了日時が欠けた予選を拒否',()=>assert.throws(()=>planDeciderFinal({weekKey:plan.weekKey,heats:plan.heats,completedHeats:[{...finished[0],finishedAt:null},finished[1]]}),/日時/));
+test('決勝結果の勝者を確定',()=>{const f=planDeciderFinal({weekKey:plan.weekKey,heats:plan.heats,completedHeats:finished});const [x,y]=f.entrantSnapshotIds;assert.equal(resolveChampionshipFinal(f,{id:f.id,status:'finished',finishedAt:'2026-11-08T13:00:00Z',results:[{rank:1,snapshotId:y},{rank:2,snapshotId:x}]}).championSnapshotId,y);});
+test('決勝未終了なら勝者を確定しない',()=>{const f=planDeciderFinal({weekKey:plan.weekKey,heats:plan.heats,completedHeats:finished});assert.throws(()=>resolveChampionshipFinal(f,{id:f.id,status:'running',results:[]}),/未確定/);});

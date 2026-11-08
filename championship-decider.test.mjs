@@ -1,0 +1,12 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {planChampionshipDecider,resolveDeciderWinner} from './championship-decider.mjs';
+const base={weekKey:'20261102',entrants:['B','A'],sundayArimaFinishedAt:'2026-11-08T12:00:00.000Z'};
+test('有馬終了30分後の東京芝2400m',()=>{const x=planChampionshipDecider(base);assert.equal(x.heats[0].scheduledAt.toISOString(),'2026-11-08T12:30:00.000Z');assert.equal(x.heats[0].distance,2400);assert.deepEqual(x.heats[0].entrantSnapshotIds,['A','B']);});
+test('18頭を超える場合は予選に分割',()=>{const x=planChampionshipDecider({...base,entrants:Array.from({length:19},(_,i)=>`id${i}`)});assert.equal(x.heats.length,2);assert.equal(x.heats[0].entrantSnapshotIds.length,10);assert.equal(x.heats[1].entrantSnapshotIds.length,9);assert.equal(x.finalNeedsScheduling,true);});
+test('同じ入力は同じIDと順序',()=>{const x=planChampionshipDecider(base),y=planChampionshipDecider({...base,entrants:['A','B']});assert.deepEqual(x,y);});
+test('重複した馬を拒否',()=>assert.throws(()=>planChampionshipDecider({...base,entrants:['A','A']}),/不正/));
+test('日時の欠落を拒否',()=>assert.throws(()=>planChampionshipDecider({...base,sundayArimaFinishedAt:undefined}),/日時/));
+test('確定結果から勝者を決める',()=>assert.equal(resolveDeciderWinner([{rank:1,snapshotId:'B'},{rank:2,snapshotId:'A'}],['A','B']),'B'));
+test('結果が欠けていたら確定しない',()=>assert.throws(()=>resolveDeciderWinner([{rank:1,snapshotId:'A'}],['A','B']),/未確定/));
+test('登録外の馬を拒否',()=>assert.throws(()=>resolveDeciderWinner([{rank:1,snapshotId:'X'},{rank:2,snapshotId:'A'}],['A','B']),/不正/));
