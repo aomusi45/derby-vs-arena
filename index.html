@@ -9,9 +9,10 @@
 .secretary-guide{display:flex;align-items:center;gap:22px;margin:22px 0 4px;padding:18px;background:linear-gradient(110deg,#123a31,#071b1b);border:1px solid #b89551;border-radius:14px;box-shadow:0 12px 30px #0005}.secretary-guide img{width:150px;height:200px;object-fit:cover;object-position:center 12%;border:2px solid #caa75e;border-radius:10px;box-shadow:0 0 20px #e4bb6733}.secretary-guide .guide-label{font-size:11px;color:#e5c67e;letter-spacing:.2em}.secretary-guide h2{color:#ffe9b1;margin:9px 0;font-size:23px}.secretary-guide p{font-size:14px;line-height:1.9;color:#d3ded5;margin:0}@media(max-width:520px){.secretary-guide{gap:13px;padding:12px}.secretary-guide img{width:112px;height:160px}.secretary-guide h2{font-size:18px}.secretary-guide p{font-size:12px}}
 .file-label{display:inline-block;padding:10px 14px;border:1px solid #d6b36b;border-radius:7px;color:#ffe3a2;cursor:pointer;margin-top:8px}#entry-file{display:block;margin:10px 0;max-width:100%;font-size:12px}#entry-preview{white-space:pre-line;overflow-wrap:anywhere}</style>
 </head>
-<body><div class="wrap"><div class="top"><div class="brand">◆ DERBY FANTASY ◆</div><div class="live">VS ARENA · 準備中</div></div><header class="hero"><div class="eyebrow">PREMIUM HORSE RACING ARENA</div><h1>DERBY FANTASY<span>OFFICIAL VS ARENA</span></h1><p class="sub">ダービーファンタジー　公式VSレース会場</p><div class="line"></div></header><main><section class="arena"><div class="arena-inner"><div class="arena-tag">THE GRAND RACE</div><div class="horse" aria-hidden="true">♞</div><div class="arena-title">RACE THE LEGEND</div><p class="arena-desc">育てた名馬が、栄光のゴールを目指す。<br>この舞台から、新たな伝説が始まる。</p><div class="lights"><i></i><i></i><i></i><i></i><i></i></div></div></section><section class="secretary-guide" aria-label="秘書からのご案内"><img src="secretary.webp" alt="ダービーファンタジーの秘書" loading="lazy"><div><div class="guide-label">RACE CONCIERGE</div><h2>秘書からのご案内</h2><p>ようこそ、公式VSレース会場へ♡<br>ただいま開催準備中です。出走受付が始まるまで、もう少しお待ちくださいね。</p></div></section><div class="section"><section class="panel"><div class="num">01 / RACE SCHEDULE</div><h2>次回開催レース</h2><span class="status" id="race-status">接続中</span><p id="race-detail" aria-live="polite">Firebaseから開催情報を取得しています。</p></section><section class="panel"><div class="num">02 / ENTRY</div><h2>出走馬登録</h2><span class="status" id="entry-status">受付サーバー未接続</span><p>ゲーム内で書き出したVS登録馬のJSONを選ぶと、内容を確認できます。</p><label for="entry-file" class="file-label">VS登録馬JSONを選択</label><input id="entry-file" type="file" accept=".json,application/json"><p id="entry-preview" aria-live="polite">まだファイルを選んでいません。</p><button id="entry-submit" type="button" disabled style="padding:12px;background:#a67e35;color:#fff;border:0;border-radius:6px;font-weight:bold">この馬を出走登録</button><p class="small" id="entry-message">※ 安全な受付サーバーの公開後に登録できます。公開前は送信できません。</p></section><section class="panel"><div class="num">03 / RESULTS</div><h2>レース結果</h2><span class="status" id="result-status">公開準備中</span><p id="result-detail" aria-live="polite">結果データを確認しています。</p></section></div></main><footer class="footer">DERBY FANTASY © VS ARENA<div class="small">※ 登録受付はサーバー公開後に利用できます。自動レース・ライブ観戦は未接続です。</div></footer></div><script type="module">
+<body><div class="wrap"><div class="top"><div class="brand">◆ DERBY FANTASY ◆</div><div class="live">VS ARENA · 準備中</div></div><header class="hero"><div class="eyebrow">PREMIUM HORSE RACING ARENA</div><h1>DERBY FANTASY<span>OFFICIAL VS ARENA</span></h1><p class="sub">ダービーファンタジー　公式VSレース会場</p><div class="line"></div></header><main><section class="arena"><div class="arena-inner"><div class="arena-tag">THE GRAND RACE</div><div class="horse" aria-hidden="true">♞</div><div class="arena-title">RACE THE LEGEND</div><p class="arena-desc">育てた名馬が、栄光のゴールを目指す。<br>この舞台から、新たな伝説が始まる。</p><div class="lights"><i></i><i></i><i></i><i></i><i></i></div></div></section><section class="secretary-guide" aria-label="秘書からのご案内"><img src="secretary.webp" alt="ダービーファンタジーの秘書" loading="lazy"><div><div class="guide-label">RACE CONCIERGE</div><h2>秘書からのご案内</h2><p>ようこそ、公式VSレース会場へ♡<br>ただいま開催準備中です。出走受付が始まるまで、もう少しお待ちくださいね。</p></div></section><div class="section"><section class="panel"><div class="num">01 / RACE SCHEDULE</div><h2>次回開催レース</h2><span class="status" id="race-status">接続中</span><p id="race-detail" aria-live="polite">Firebaseから開催情報を取得しています。</p></section><section class="panel"><div class="num">02 / ENTRY</div><h2>出走馬登録</h2><span class="status" id="entry-status">受付準備中</span><p>ログイン後、ゲーム内で書き出したVS登録馬JSONを選んで登録します。</p><button id="google-login" type="button" style="padding:9px;margin:5px 4px 8px 0">Googleでログイン</button><button id="guest-login" type="button" style="padding:9px;margin:5px 0 8px">ゲストでログイン</button><p id="login-status" class="small">未ログイン</p><label for="entry-file" class="file-label">VS登録馬JSONを選択</label><input id="entry-file" type="file" accept=".json,application/json"><p id="entry-preview" aria-live="polite">まだファイルを選んでいません。</p><button id="entry-submit" type="button" disabled style="padding:12px;background:#a67e35;color:#fff;border:0;border-radius:6px;font-weight:bold">この馬を出走登録</button><p class="small" id="entry-message">※ Firestoreルール設定後、受付中のレースに登録できます。VSデータがない間は登録ボタンは無効です。</p></section><section class="panel"><div class="num">03 / RESULTS</div><h2>レース結果</h2><span class="status" id="result-status">公開準備中</span><p id="result-detail" aria-live="polite">結果データを確認しています。</p></section></div></main><footer class="footer">DERBY FANTASY © VS ARENA<div class="small">※ 自動レース・ライブ観戦は未接続です。</div></footer></div><script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-app.js";
-import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
+import { getFirestore, collection, onSnapshot, doc, runTransaction, serverTimestamp } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDgdYcIr03txu21GqvK04_ZwK7kffaQxgY",
@@ -21,51 +22,115 @@ const firebaseConfig = {
   messagingSenderId: "998531404443",
   appId: "1:998531404443:web:3436b76df88abd4f706c3e"
 };
-// Read-only Firestore remains unchanged. No unauthenticated writes.
-import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-auth.js";
-import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-functions.js";
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
-const functions = getFunctions(app, 'asia-northeast1');
-const registerHorse = httpsCallable(functions, 'registerHorse');
 let selectedEntry = null;
+let openRace = null;
 const submit = document.getElementById('entry-submit');
 const entryMessage = document.getElementById('entry-message');
 const input = document.getElementById('entry-file');
+const entryStatus = document.getElementById('entry-status');
+const loginStatus = document.getElementById('login-status');
+const googleLogin = document.getElementById('google-login');
+const guestLogin = document.getElementById('guest-login');
+const stats = ['sp','sta','kick','early','sustain','grit','stability'];
+const timeOf = value => value?.toMillis?.() ?? (value ? new Date(value).getTime() : NaN);
+function refreshEntryState() {
+  const deadline = openRace ? timeOf(openRace.scheduledAt) - 60000 : NaN;
+  const ready = !!auth.currentUser && !!selectedEntry && !!openRace &&
+    openRace.status === 'open' && Number(openRace.registeredCount ?? 0) < 18 &&
+    Number.isFinite(deadline) && Date.now() < deadline;
+  submit.disabled = !ready;
+  if (!openRace) entryStatus.textContent = '受付レース未設定';
+  else if (openRace.status !== 'open') entryStatus.textContent = '受付準備中';
+  else if (Number(openRace.registeredCount ?? 0) >= 18) entryStatus.textContent = '満員（18頭）';
+  else if (Date.now() >= deadline) entryStatus.textContent = '受付締切';
+  else entryStatus.textContent = `受付中（${Number(openRace.registeredCount ?? 0)}/18頭）`;
+}
+onAuthStateChanged(auth, user => {
+  loginStatus.textContent = user ? (user.isAnonymous ? 'ゲストとしてログイン中' : `Googleログイン中：${user.displayName || 'ユーザー'}`) : '未ログイン';
+  googleLogin.disabled = !!user;
+  guestLogin.disabled = !!user;
+  refreshEntryState();
+});
+googleLogin.addEventListener('click', async () => {
+  try { await signInWithPopup(auth, new GoogleAuthProvider()); }
+  catch (e) { loginStatus.textContent = 'ログインできません：' + (e.message || '認証エラー'); }
+});
+guestLogin.addEventListener('click', async () => {
+  try { await signInAnonymously(auth); }
+  catch (e) { loginStatus.textContent = 'ログインできません：' + (e.message || '認証エラー'); }
+});
 input.addEventListener('change', async () => {
   const file = input.files?.[0], preview = document.getElementById('entry-preview');
-  const status = document.getElementById('entry-status');
-  selectedEntry = null; submit.disabled = true;
-  if (!file) { preview.textContent='まだファイルを選んでいません。'; return; }
-  if (file.size > 2_000_000 || !/\.json$/i.test(file.name)) {
-    status.textContent='ファイル形式エラー'; preview.textContent='2MB以下のJSONファイルを選んでください。'; return;
+  selectedEntry = null;
+  refreshEntryState();
+  if (!file) { preview.textContent = 'まだファイルを選んでいません。'; return; }
+  if (file.size > 900000 || !/\.json$/i.test(file.name)) {
+    preview.textContent = '900KB以下のJSONファイルを選んでください。'; return;
   }
   try {
-    const data=JSON.parse(await file.text());
-    if (!data || Array.isArray(data) || typeof data!=='object' || !data.snapshotId || !data.sourceHorseId || !data.horse || !data.raceStats || !data.raceContext) throw Error('VS登録馬の書き出し形式と一致しません。');
-    const stats=['sp','sta','kick','early','sustain','grit','stability'];
-    if (!stats.every(k => Number.isFinite(Number(data.raceStats?.[k]?.total)))) throw Error('能力データが不足しています。');
-    const c=data.raceContext;
-    selectedEntry = data; submit.disabled = false; status.textContent='JSON検査OK（未登録）';
-    preview.textContent=`馬名：${String(data.name||data.horse.name||'不明').slice(0,40)}\n脚質：${String(c.tactic||data.horse.tactic||'不明').slice(0,20)}\n距離適性：${c.aptMin??data.horse.aptMin??'—'}～${c.aptMax??data.horse.aptMax??'—'}m\n装備：${Array.isArray(data.df153Equipment)?data.df153Equipment.length:0}個\n能力7項目：確認済み\n※ Firebaseには送信していません。`;
-  } catch(e) { selectedEntry=null; submit.disabled=true; status.textContent='JSON検査エラー';preview.textContent=e.message||'JSONを読み込めませんでした。'; }
+    const data = JSON.parse(await file.text());
+    if (!data || Array.isArray(data) || typeof data !== 'object' ||
+        typeof data.snapshotId !== 'string' || !data.snapshotId ||
+        !data.sourceHorseId || !data.horse || !data.raceStats || !data.raceContext)
+      throw Error('VS登録馬の書き出し形式と一致しません。');
+    if (!stats.every(k => Number.isFinite(Number(data.raceStats?.[k]?.total))))
+      throw Error('能力データが不足しています。');
+    selectedEntry = data;
+    const c = data.raceContext;
+    preview.textContent = `馬名：${String(data.name || data.horse.name || '不明').slice(0,40)}\n脚質：${String(c.tactic || data.horse.tactic || '不明').slice(0,20)}\n距離適性：${c.aptMin ?? data.horse.aptMin ?? '—'}～${c.aptMax ?? data.horse.aptMax ?? '—'}m\n能力7項目：確認済み\n※ まだ送信していません。`;
+    refreshEntryState();
+  } catch (e) { selectedEntry = null; preview.textContent = e.message || 'JSONを読み込めませんでした。'; refreshEntryState(); }
 });
 submit.addEventListener('click', async () => {
-  if (!selectedEntry || submit.disabled) return;
-  submit.disabled = true;
-  entryMessage.textContent = '出走登録を確認しています…';
-  try {
-    if (!auth.currentUser) await signInAnonymously(auth);
-    const result = await registerHorse({entry:selectedEntry});
-    document.getElementById('entry-status').textContent = '出走登録完了';
-    entryMessage.textContent = '登録完了：' + String(result.data?.raceId || '次回レース');
-    selectedEntry = null;
-  } catch (e) {
-    entryMessage.textContent = '登録できません：' + (e.code === 'functions/not-found' ? '受付サーバーが未公開です。' : (e.message || '通信エラー'));
-    submit.disabled = false;
+  if (submit.disabled || !selectedEntry || !openRace || !auth.currentUser) return;
+  const race = openRace;
+  const user = auth.currentUser;
+  const payload = JSON.stringify(selectedEntry);
+  if (new TextEncoder().encode(payload).length > 900000) {
+    entryMessage.textContent = 'データが大きすぎます。'; return;
   }
+  submit.disabled = true;
+  entryMessage.textContent = '出走登録中…';
+  try {
+    const raceRef = doc(db, 'races', race.id);
+    const entryRef = doc(db, 'races', race.id, 'entries', user.uid);
+    await runTransaction(db, async tx => {
+      const raceSnap = await tx.get(raceRef);
+      const entrySnap = await tx.get(entryRef);
+      if (!raceSnap.exists()) throw Error('レースがありません。');
+      const data = raceSnap.data();
+      const deadline = timeOf(data.scheduledAt) - 60000;
+      if (data.status !== 'open' || !Number.isFinite(deadline) || Date.now() >= deadline)
+        throw Error('受付時間外です。');
+      const count = Number(data.registeredCount ?? 0);
+      if (!entrySnap.exists() && count >= 18) throw Error('定員18頭に達しました。');
+      const entry = {
+        uid: user.uid,
+        raceId: race.id,
+        horseName: String(selectedEntry.name || selectedEntry.horse.name || '不明').slice(0,40),
+        snapshotId: String(selectedEntry.snapshotId).slice(0,160),
+        horseJson: payload,
+        updatedAt: serverTimestamp()
+      };
+      if (entrySnap.exists()) {
+        tx.update(entryRef, {horseName:entry.horseName, snapshotId:entry.snapshotId, horseJson:entry.horseJson, updatedAt:entry.updatedAt});
+      } else {
+        tx.set(entryRef, entry);
+        tx.update(raceRef, {registeredCount: count + 1});
+      }
+    });
+    entryStatus.textContent = '出走登録完了';
+    entryMessage.textContent = '登録完了：' + race.id + '（このレース1回のみ）';
+    selectedEntry = null;
+    input.value = '';
+  } catch(e) {
+    entryMessage.textContent = '登録できません：' + (e.code === 'permission-denied' ? 'Firestoreルールまたは受付設定を確認してください。' : (e.message || '通信エラー'));
+  } finally { refreshEntryState(); }
 });
+setInterval(refreshEntryState, 10000);
 const el = id => document.getElementById(id);
 const statusText = { waiting: "開催待機中", open: "出走受付中", closed: "受付終了", running: "レース進行中", finished: "レース終了", completed: "レース終了" };
 function dateLabel(value) {
@@ -83,6 +148,8 @@ function update(snapshot) {
     return t(a.scheduledAt ?? a.startAt) - t(b.scheduledAt ?? b.startAt);
   });
   const next = upcoming[0];
+  openRace = upcoming.find(r => r.status === 'open' && Number.isFinite(timeOf(r.scheduledAt)) && Date.now() < timeOf(r.scheduledAt) - 60000) || null;
+  refreshEntryState();
   el('race-status').textContent = next ? (statusText[next.status] || '開催予定') : '開催予定なし';
   el('race-detail').textContent = next ? dateLabel(next.scheduledAt ?? next.startAt) : '現在、公開されている開催予定はありません。';
   const completed = races.filter(r => ['finished','completed'].includes(r.status));
