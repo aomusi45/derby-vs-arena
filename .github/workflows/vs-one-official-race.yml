@@ -1,0 +1,36 @@
+name: VS ARENA create one official race
+on:
+  workflow_dispatch:
+    inputs:
+      race_id:
+        description: '新規レースID（official_manual_で始める）'
+        required: true
+        default: 'official_manual_20261109_0000'
+        type: string
+      scheduled_at:
+        description: '発走日時（日本時間、例 2026-11-09T00:00:00+09:00）'
+        required: true
+        default: '2026-11-09T00:00:00+09:00'
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: vs-arena-weekly-create
+  cancel-in-progress: false
+jobs:
+  create:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --ignore-scripts
+      - name: Create one official race
+        env:
+          FIREBASE_PROJECT_ID: derby-vs-arena
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+          VS_ONE_OFFICIAL_RACE_ENABLED: 'true'
+          RACE_ID: ${{ inputs.race_id }}
+          SCHEDULED_AT: ${{ inputs.scheduled_at }}
+        run: node create-one-official-race.mjs --apply --id "$RACE_ID" --at "$SCHEDULED_AT"
