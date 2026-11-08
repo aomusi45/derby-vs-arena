@@ -9,7 +9,7 @@
 .secretary-guide{display:flex;align-items:center;gap:22px;margin:22px 0 4px;padding:18px;background:linear-gradient(110deg,#123a31,#071b1b);border:1px solid #b89551;border-radius:14px;box-shadow:0 12px 30px #0005}.secretary-guide img{width:150px;height:200px;object-fit:cover;object-position:center 12%;border:2px solid #caa75e;border-radius:10px;box-shadow:0 0 20px #e4bb6733}.secretary-guide .guide-label{font-size:11px;color:#e5c67e;letter-spacing:.2em}.secretary-guide h2{color:#ffe9b1;margin:9px 0;font-size:23px}.secretary-guide p{font-size:14px;line-height:1.9;color:#d3ded5;margin:0}@media(max-width:520px){.secretary-guide{gap:13px;padding:12px}.secretary-guide img{width:112px;height:160px}.secretary-guide h2{font-size:18px}.secretary-guide p{font-size:12px}}
 .file-label{display:inline-block;padding:10px 14px;border:1px solid #d6b36b;border-radius:7px;color:#ffe3a2;cursor:pointer;margin-top:8px}#entry-file{display:block;margin:10px 0;max-width:100%;font-size:12px}#entry-preview,#result-detail{white-space:pre-line;overflow-wrap:anywhere}</style>
 </head>
-<body><div class="wrap"><div class="top"><div class="brand">◆ DERBY FANTASY ◆</div><div class="live">VS ARENA · 準備中</div></div><header class="hero"><div class="eyebrow">PREMIUM HORSE RACING ARENA</div><h1>DERBY FANTASY<span>OFFICIAL VS ARENA</span></h1><p class="sub">ダービーファンタジー　公式VSレース会場</p><div class="line"></div></header><main><section class="arena"><div class="arena-inner"><div class="arena-tag">THE GRAND RACE</div><div class="horse" aria-hidden="true">♞</div><div class="arena-title">RACE THE LEGEND</div><p class="arena-desc">育てた名馬が、栄光のゴールを目指す。<br>この舞台から、新たな伝説が始まる。</p><div class="lights"><i></i><i></i><i></i><i></i><i></i></div></div></section><section class="secretary-guide" aria-label="秘書からのご案内"><img src="secretary.webp" alt="ダービーファンタジーの秘書" loading="lazy"><div><div class="guide-label">RACE CONCIERGE</div><h2>秘書からのご案内</h2><p>ようこそ、公式VSレース会場へ♡<br>ただいま開催準備中です。出走受付が始まるまで、もう少しお待ちくださいね。</p></div></section><div class="section"><section class="panel"><div class="num">01 / RACE SCHEDULE</div><h2>次回開催レース</h2><span class="status" id="race-status">接続中</span><p id="race-detail" aria-live="polite">Firebaseから開催情報を取得しています。</p></section><section class="panel"><div class="num">02 / ENTRY</div><h2>出走馬登録</h2><span class="status" id="entry-status">受付準備中</span><p>ログイン後、ゲーム内で書き出したVS登録馬JSONを選んで登録します。</p><button id="google-login" type="button" style="padding:9px;margin:5px 4px 8px 0">Googleでログイン</button><button id="guest-login" type="button" style="padding:9px;margin:5px 0 8px">ゲストでログイン</button><p id="login-status" class="small">未ログイン</p><label for="entry-file" class="file-label">VS登録馬JSONを選択</label><input id="entry-file" type="file" accept=".json,application/json"><p id="entry-preview" aria-live="polite">まだファイルを選んでいません。</p><button id="entry-submit" type="button" disabled style="padding:12px;background:#a67e35;color:#fff;border:0;border-radius:6px;font-weight:bold">この馬を出走登録</button><p class="small" id="entry-message">※ Firestoreルール設定後、受付中のレースに登録できます。VSデータがない間は登録ボタンは無効です。</p></section><section class="panel"><div class="num">03 / RESULTS</div><h2>レース結果</h2><span class="status" id="result-status">公開準備中</span><p id="result-detail" aria-live="polite">結果データを確認しています。</p></section></div></main><footer class="footer">DERBY FANTASY © VS ARENA<div class="small">※ 自動レース・ライブ観戦は未接続です。</div></footer></div><script type="module">
+<body><div class="wrap"><div class="top"><div class="brand">◆ DERBY FANTASY ◆</div><div class="live">VS ARENA · 準備中</div></div><header class="hero"><div class="eyebrow">PREMIUM HORSE RACING ARENA</div><h1>DERBY FANTASY<span>OFFICIAL VS ARENA</span></h1><p class="sub">ダービーファンタジー　公式VSレース会場</p><div class="line"></div></header><main><section class="arena"><div class="arena-inner"><div class="arena-tag">THE GRAND RACE</div><div class="horse" aria-hidden="true">♞</div><div class="arena-title">RACE THE LEGEND</div><p class="arena-desc">育てた名馬が、栄光のゴールを目指す。<br>この舞台から、新たな伝説が始まる。</p><div class="lights"><i></i><i></i><i></i><i></i><i></i></div></div></section><section class="secretary-guide" aria-label="秘書からのご案内"><img src="secretary.webp" alt="ダービーファンタジーの秘書" loading="lazy"><div><div class="guide-label">RACE CONCIERGE</div><h2>秘書からのご案内</h2><p>ようこそ、公式VSレース会場へ♡<br>ただいま開催準備中です。出走受付が始まるまで、もう少しお待ちくださいね。</p></div></section><div class="section"><section class="panel"><div class="num">01 / RACE SCHEDULE</div><h2>次回開催レース</h2><span class="status" id="race-status">接続中</span><label for="race-select" style="display:block;margin-top:14px;color:#f8e5ad;font-size:13px">表示するレースを選択</label><select id="race-select" aria-label="表示するレース" disabled style="display:block;width:100%;max-width:100%;padding:10px;margin-top:7px;border:1px solid #b89551;border-radius:6px;background:#09221f;color:#fff6da"><option>読み込み中…</option></select><p id="race-detail" aria-live="polite">Firebaseから開催情報を取得しています。</p></section><section class="panel"><div class="num">02 / ENTRY</div><h2>出走馬登録</h2><span class="status" id="entry-status">受付準備中</span><p>ログイン後、ゲーム内で書き出したVS登録馬JSONを選んで登録します。</p><button id="google-login" type="button" style="padding:9px;margin:5px 4px 8px 0">Googleでログイン</button><button id="guest-login" type="button" style="padding:9px;margin:5px 0 8px">ゲストでログイン</button><p id="login-status" class="small">未ログイン</p><label for="entry-file" class="file-label">VS登録馬JSONを選択</label><input id="entry-file" type="file" accept=".json,application/json"><p id="entry-preview" aria-live="polite">まだファイルを選んでいません。</p><button id="entry-submit" type="button" disabled style="padding:12px;background:#a67e35;color:#fff;border:0;border-radius:6px;font-weight:bold">この馬を出走登録</button><p class="small" id="entry-message">※ Firestoreルール設定後、受付中のレースに登録できます。VSデータがない間は登録ボタンは無効です。</p></section><section class="panel"><div class="num">03 / RESULTS</div><h2>レース結果</h2><span class="status" id="result-status">公開準備中</span><p id="result-detail" aria-live="polite">結果データを確認しています。</p></section></div></main><footer class="footer">DERBY FANTASY © VS ARENA<div class="small">※ 自動レース・ライブ観戦は未接続です。</div></footer></div><script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-app.js";
 import { getFirestore, collection, onSnapshot, doc, runTransaction, serverTimestamp } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-auth.js";
@@ -144,26 +144,56 @@ function dateLabel(value) {
   } catch { return "開催時刻は未設定です。"; }
 }
 let latestRaceSnapshot = null;
+let selectedRaceId = null;
+const raceSelect = document.getElementById('race-select');
+raceSelect.addEventListener('change', () => {
+  selectedRaceId = raceSelect.value;
+  if (latestRaceSnapshot) update(latestRaceSnapshot);
+});
 function update(snapshot) {
   latestRaceSnapshot = snapshot;
   const races = snapshot.docs.map(d => ({id:d.id, ...d.data()}));
-  // 開催日時が過ぎた未更新のレースを「次回開催」に出さない。
+  // 今後の開催を優先し、過去のテストレースも確認できるようにする。
   const now = Date.now();
-  const upcoming = races.filter(r =>
-    !['finished','completed','cancelled'].includes(r.status) &&
-    Number.isFinite(timeOf(r.scheduledAt ?? r.startAt)) &&
-    timeOf(r.scheduledAt ?? r.startAt) > now
+  const available = races.filter(r =>
+    r.status !== 'cancelled' &&
+    Number.isFinite(timeOf(r.scheduledAt ?? r.startAt))
   );
-  upcoming.sort((a,b) => timeOf(a.scheduledAt ?? a.startAt) - timeOf(b.scheduledAt ?? b.startAt));
-  const next = upcoming[0] || null;
-  // 表示中のレースと登録先のレースを必ず一致させる。
+  available.sort((a, b) => {
+    const at = timeOf(a.scheduledAt ?? a.startAt), bt = timeOf(b.scheduledAt ?? b.startAt);
+    const aPast = at <= now, bPast = bt <= now;
+    if (aPast !== bPast) return aPast ? 1 : -1;
+    return aPast ? bt - at : at - bt;
+  });
+  if (!available.some(r => r.id === selectedRaceId)) {
+    selectedRaceId = available[0]?.id ?? null;
+  }
+  // 選択中のレースIDを保持し、表示と登録先を常に一致させる。
+  raceSelect.replaceChildren();
+  if (!available.length) {
+    raceSelect.add(new Option('選択できるレースはありません', ''));
+  } else {
+    for (const r of available) {
+      const date = new Intl.DateTimeFormat('ja-JP', {
+        timeZone:'Asia/Tokyo', month:'2-digit', day:'2-digit',
+        hour:'2-digit', minute:'2-digit'
+      }).format(new Date(timeOf(r.scheduledAt ?? r.startAt)));
+      const testLabel = r.test === true ? '【単発テスト】' : '';
+      const pastLabel = timeOf(r.scheduledAt ?? r.startAt) <= now ? '（開催時刻経過）' : '';
+      raceSelect.add(new Option(`${testLabel}${r.raceName || r.id} ${date}${pastLabel}`, r.id));
+    }
+    raceSelect.value = selectedRaceId;
+  }
+  raceSelect.disabled = !available.length;
+  const next = available.find(r => r.id === selectedRaceId) || null;
   openRace = next && next.status === 'open' &&
     now < timeOf(next.scheduledAt ?? next.startAt) - 60000 ? next : null;
   refreshEntryState();
   el('race-status').textContent = next ? (statusText[next.status] || '開催予定') : '開催予定なし';
   el('race-detail').textContent = next ?
-    (next.raceName ? next.raceName + '\n' : '') + dateLabel(next.scheduledAt ?? next.startAt) :
-    '現在、公開されている今後の開催予定はありません。';
+    (next.raceName ? next.raceName + '\n' : '') + dateLabel(next.scheduledAt ?? next.startAt) +
+    (timeOf(next.scheduledAt ?? next.startAt) <= now ? '\n※ 開催時刻を過ぎています。出走登録はできません。' : '') :
+    '現在、表示できるレースはありません。';
   const completed = races.filter(r => ['finished','completed'].includes(r.status));
   completed.sort((a,b) => {
     const t = v => v?.toMillis?.() ?? (v ? new Date(v).getTime() : 0);
