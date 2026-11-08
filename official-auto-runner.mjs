@@ -31,9 +31,13 @@ export async function executeInChromium({engineHtml,prepared,timeoutMs=240000,ch
     const page=await browser.newPage({viewport:{width:1280,height:800}});
     const errors=[];
     page.on('pageerror',e=>errors.push(String(e.message).slice(0,400)));
+    let stage='load-html';
+    try {
     await page.goto(pathToFileURL(resolve(engineHtml)).href,{waitUntil:'domcontentloaded',timeout:90000});
     await page.evaluate(()=>window.__df47Start3D?.());
+    stage='wait-engine-ready';
     await page.waitForFunction(()=>window.__raceReady3D===true,null,{timeout:120000});
+    stage='start-race';
     const launched=await page.evaluate(({field,distance,going})=>{
       const engine=window.DFV30SharedRace;
       if(!engine || engine.getStatus()?.active) throw Error('VSエンジンが未準備です');
@@ -45,6 +49,7 @@ export async function executeInChromium({engineHtml,prepared,timeoutMs=240000,ch
       return {ok:true,count:result.count};
     },prepared);
     if(!launched.ok || launched.count!==prepared.field.length) throw Error('発走要求に失敗しました');
+    stage='wait-race-results';
     await page.waitForFunction(count=>{
       let status=window.DFV30SharedRace?.getStatus?.();
       if(status?.active && status.race==='runout'){
@@ -56,6 +61,7 @@ export async function executeInChromium({engineHtml,prepared,timeoutMs=240000,ch
       }
       return status?.active && status.race==='finished' && document.body.dataset.gameScreen==='results' && document.querySelectorAll('#resultrows .result-line').length===count;
     },prepared.field.length,{timeout:timeoutMs});
+    stage='read-results';
     const results=await page.evaluate(()=>[...document.querySelectorAll('#resultrows .result-line')].map((row,i)=>{
       const txt=selector=>row.querySelector(selector)?.textContent?.trim()||'';
       const nameNode=row.querySelector('.df28-result-name');
@@ -64,6 +70,20 @@ export async function executeInChromium({engineHtml,prepared,timeoutMs=240000,ch
       return {rank:Number(txt('.result-rank').replace(/着$/,'')),number:Number(txt('.result-bib')),name,...(i===0?{winningTime:detail}:{marginBehindPrevious:detail})};
     }));
     return {results,errors};
+    } catch (error) {
+      let diagnostic={};
+      try {
+        diagnostic=await page.evaluate(()=>({
+          ready:window.__raceReady3D===true,
+          enginePresent:!!window.DFV30SharedRace,
+          status:window.DFV30SharedRace?.getStatus?.()??null,
+          screen:document.body?.dataset?.gameScreen??null,
+          resultRows:document.querySelectorAll('#resultrows .result-line').length,
+          finishButton:(()=>{const b=document.getElementById('dfNormalFinishButton');return b?{hidden:b.hidden,disabled:b.disabled}:null;})()
+        }));
+      } catch (inspectionError) {diagnostic={inspectionError:String(inspectionError.message||inspectionError)};}
+      throw new Error(`Ver.92 race stage=${stage}; ${String(error.message||error)}; diagnostics=${JSON.stringify(diagnostic).slice(0,1500)}; pageErrors=${JSON.stringify(errors.slice(-3))}`);
+    }
   } finally {await browser.close();}
 }
 
