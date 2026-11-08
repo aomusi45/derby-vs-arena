@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {prepareOfficialField,sendToExistingEngine} from './vs-field-adapter.mjs';
+const sample={snapshotId:'s1',sourceHorseId:'h1',name:'サンプルホース',horse:{name:'サンプルホース'},raceContext:{tactic:'先行',aptMin:1200,aptMax:2000},raceStats:Object.fromEntries(['sp','sta','kick','early','sustain','grit','stability'].map(k=>[k,{total:80}]))};
+test('Firestore horseJsonをVer.92のVS出走馬形式へ変換',()=>{const result=prepareOfficialField([{horseJson:JSON.stringify(sample)}]);assert.equal(result.field[0].speed,80);assert.equal(result.field[0].name,'サンプルホース');assert.equal(result.field[0].isCom,false)});
+test('重複馬を拒否',()=>assert.throws(()=>prepareOfficialField([sample,sample]),/重複/));
+test('19頭を拒否',()=>assert.throws(()=>prepareOfficialField(Array(19).fill(sample)),/1～18/));
+test('能力不足を拒否',()=>assert.throws(()=>prepareOfficialField([{...sample,raceStats:{}}]),/sp/));
+test('本体エンジンのstartを直接呼び出す',()=>{let args;const result=sendToExistingEngine({DFV30SharedRace:{start:(...a)=>{args=a;return {ok:true}}}},prepareOfficialField([sample]));assert.equal(result.ok,true);assert.equal(args[0][0].name,'サンプルホース')});
+test('エンジン未起動を拒否',()=>assert.throws(()=>sendToExistingEngine({},prepareOfficialField([sample])),/未起動/));
