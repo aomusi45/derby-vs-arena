@@ -1,0 +1,52 @@
+﻿name: VS ARENA single test race
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  create:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --ignore-scripts
+      - name: Create one test race
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { initializeApp, cert } from 'firebase-admin/app';
+          import { getFirestore } from 'firebase-admin/firestore';
+          import { buildSingleTestRace } from './create-single-test-race.mjs';
+
+          const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+          if (!raw) throw new Error('Firebase認証情報がありません');
+
+          const credentials = JSON.parse(raw);
+          if (credentials.project_id !== 'derby-vs-arena') {
+            throw new Error('Firebaseプロジェクトが一致しません');
+          }
+
+          initializeApp({ credential: cert(credentials) });
+          const db = getFirestore();
+
+          const race = buildSingleTestRace();
+          const { id, ...fields } = race;
+          fields.scheduledAt = new Date(Date.now() + 3600000);
+
+          try {
+            await db.collection('races').doc(id).create(fields);
+            console.log('CREATED:', id);
+          } catch (error) {
+            if (error.code === 6 || error.code === 'already-exists') {
+              console.log('ALREADY EXISTS:', id);
+            } else {
+              throw error;
+            }
+          }
+          NODE
