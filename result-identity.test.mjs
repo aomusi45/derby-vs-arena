@@ -1,0 +1,13 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {attachVerifiedSnapshotIds as bind} from './result-identity.mjs';
+import {validateRaceResult} from './firestore-result-save.mjs';
+const prepared={field:[{number:1,name:'同名'},{number:2,name:'同名'}]};
+const entries=[{horseJson:JSON.stringify({snapshotId:'horse-a'})},{horseJson:JSON.stringify({snapshotId:'horse-b'})}];
+const result={raceId:'race_1',source:'DBF-Ver92-result-board',count:2,results:[{rank:1,number:2,name:'同名',winningTime:'2:30.0'},{rank:2,number:1,name:'同名',marginBehindPrevious:'1馬身'}]};
+test('同名の馬も馬番で正しい登録IDに結びつく',()=>assert.deepEqual(bind(prepared,result,entries).results.map(r=>r.snapshotId),['horse-b','horse-a']));
+test('保存前検証でも登録IDを保持する',()=>assert.deepEqual(validateRaceResult(bind(prepared,result,entries)).results.map(r=>r.snapshotId),['horse-b','horse-a']));
+test('ブラウザ結果からの偽装IDを拒否',()=>assert.throws(()=>bind(prepared,{...result,results:[{...result.results[0],snapshotId:'fake'},result.results[1]]},entries),/不正な識別子/));
+test('登録IDの重複を拒否',()=>assert.throws(()=>bind(prepared,result,[entries[0],entries[0]]),/識別情報/));
+test('馬番の不一致を拒否',()=>assert.throws(()=>bind(prepared,{...result,results:[{...result.results[0],number:3},result.results[1]]},entries),/一致しません/));
+test('元の結果は書き換えない',()=>{bind(prepared,result,entries);assert.equal(result.results[0].snapshotId,undefined);});

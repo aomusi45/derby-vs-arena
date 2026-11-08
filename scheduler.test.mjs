@@ -1,0 +1,13 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {evaluateRace, prepareRaceForExecution, toMillis} from './race-scheduler.mjs';
+const now=Date.parse('2026-11-08T07:00:00Z');
+const race={id:'r1',status:'open',scheduledAt:new Date(now+60000).toISOString()};
+test('Firestore timestamp conversion',()=>assert.equal(toMillis({seconds:now/1000,nanoseconds:0}),now));
+test('one minute before start closes registration',()=>assert.equal(evaluateRace(race,now).action,'close'));
+test('before cutoff leaves race open',()=>assert.equal(evaluateRace({...race,scheduledAt:new Date(now+61000).toISOString()},now).action,'none'));
+test('already closed race is not processed again',()=>assert.equal(evaluateRace({...race,status:'closed'},now).action,'none'));
+test('missing date rejected safely',()=>assert.equal(evaluateRace({...race,scheduledAt:null},now).action,'invalid'));
+test('race cannot start while open',()=>assert.throws(()=>prepareRaceForExecution({...race,registeredCount:0},[]),/受付終了/));
+test('race count must match entry documents',()=>assert.throws(()=>prepareRaceForExecution({...race,status:'closed',registeredCount:1},[]),/登録頭数/));
+test('empty race cannot be passed to race engine',()=>assert.throws(()=>prepareRaceForExecution({...race,status:'closed',registeredCount:0},[]),/1～18頭/));

@@ -1,0 +1,12 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {verifyEntryRoster,verifyResultRoster} from './race-integrity.mjs';
+test('matching entry count',()=>assert.equal(verifyEntryRoster({registeredCount:2},[{uid:'a'},{uid:'b'}]),true));
+test('rejects missing entry',()=>assert.throws(()=>verifyEntryRoster({registeredCount:2},[{uid:'a'}]),/頭数/));
+test('rejects duplicate uid',()=>assert.throws(()=>verifyEntryRoster({registeredCount:2},[{uid:'a'},{uid:'a'}]),/UID/));
+test('rejects absent uid',()=>assert.throws(()=>verifyEntryRoster({registeredCount:1},[{}]),/UID/));
+const prepared={field:[{number:1,name:'馬A'},{number:2,name:'馬B'}]};
+test('valid result roster',()=>assert.equal(verifyResultRoster(prepared,{results:[{number:2,name:'馬B'},{number:1,name:'馬A'}]}),true));
+test('rejects foreign horse',()=>assert.throws(()=>verifyResultRoster(prepared,{results:[{number:2,name:'馬C'},{number:1,name:'馬A'}]}),/一致/));
+test('rejects missing result',()=>assert.throws(()=>verifyResultRoster(prepared,{results:[{number:1,name:'馬A'}]}),/件数/));
+test('rejects duplicate starting numbers',()=>assert.throws(()=>verifyResultRoster({field:[{number:1,name:'馬A'},{number:1,name:'馬B'}]},{results:[{number:1,name:'馬A'},{number:2,name:'馬B'}]}),/重複/));
