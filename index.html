@@ -9,4 +9,52 @@
 .secretary-guide{display:flex;align-items:center;gap:22px;margin:22px 0 4px;padding:18px;background:linear-gradient(110deg,#123a31,#071b1b);border:1px solid #b89551;border-radius:14px;box-shadow:0 12px 30px #0005}.secretary-guide img{width:150px;height:200px;object-fit:cover;object-position:center 12%;border:2px solid #caa75e;border-radius:10px;box-shadow:0 0 20px #e4bb6733}.secretary-guide .guide-label{font-size:11px;color:#e5c67e;letter-spacing:.2em}.secretary-guide h2{color:#ffe9b1;margin:9px 0;font-size:23px}.secretary-guide p{font-size:14px;line-height:1.9;color:#d3ded5;margin:0}@media(max-width:520px){.secretary-guide{gap:13px;padding:12px}.secretary-guide img{width:112px;height:160px}.secretary-guide h2{font-size:18px}.secretary-guide p{font-size:12px}}
 </style>
 </head>
-<body><div class="wrap"><div class="top"><div class="brand">◆ DERBY FANTASY ◆</div><div class="live">VS ARENA · 準備中</div></div><header class="hero"><div class="eyebrow">PREMIUM HORSE RACING ARENA</div><h1>DERBY FANTASY<span>OFFICIAL VS ARENA</span></h1><p class="sub">ダービーファンタジー　公式VSレース会場</p><div class="line"></div></header><main><section class="arena"><div class="arena-inner"><div class="arena-tag">THE GRAND RACE</div><div class="horse" aria-hidden="true">♞</div><div class="arena-title">RACE THE LEGEND</div><p class="arena-desc">育てた名馬が、栄光のゴールを目指す。<br>この舞台から、新たな伝説が始まる。</p><div class="lights"><i></i><i></i><i></i><i></i><i></i></div></div></section><section class="secretary-guide" aria-label="秘書からのご案内"><img src="secretary.webp" alt="ダービーファンタジーの秘書" loading="lazy"><div><div class="guide-label">RACE CONCIERGE</div><h2>秘書からのご案内</h2><p>ようこそ、公式VSレース会場へ♡<br>ただいま開催準備中です。出走受付が始まるまで、もう少しお待ちくださいね。</p></div></section><div class="section"><section class="panel"><div class="num">01 / RACE SCHEDULE</div><h2>次回開催レース</h2><span class="status">開催準備中</span><p>開催時刻と出走情報は、システム接続後に表示します。</p></section><section class="panel"><div class="num">02 / ENTRY</div><h2>出走馬登録</h2><span class="status">受付準備中</span><p>育てた馬のデータを受け付ける機能を準備しています。</p></section><section class="panel"><div class="num">03 / RESULTS</div><h2>レース結果</h2><span class="status">公開準備中</span><p>着順・タイムなどの結果を、レース開催後に公開します。</p></section></div></main><footer class="footer">DERBY FANTASY © VS ARENA<div class="small">※ 現在はデザイン公開用。自動レース・馬データ受付は未接続です。</div></footer></div></body></html>
+<body><div class="wrap"><div class="top"><div class="brand">◆ DERBY FANTASY ◆</div><div class="live">VS ARENA · 準備中</div></div><header class="hero"><div class="eyebrow">PREMIUM HORSE RACING ARENA</div><h1>DERBY FANTASY<span>OFFICIAL VS ARENA</span></h1><p class="sub">ダービーファンタジー　公式VSレース会場</p><div class="line"></div></header><main><section class="arena"><div class="arena-inner"><div class="arena-tag">THE GRAND RACE</div><div class="horse" aria-hidden="true">♞</div><div class="arena-title">RACE THE LEGEND</div><p class="arena-desc">育てた名馬が、栄光のゴールを目指す。<br>この舞台から、新たな伝説が始まる。</p><div class="lights"><i></i><i></i><i></i><i></i><i></i></div></div></section><section class="secretary-guide" aria-label="秘書からのご案内"><img src="secretary.webp" alt="ダービーファンタジーの秘書" loading="lazy"><div><div class="guide-label">RACE CONCIERGE</div><h2>秘書からのご案内</h2><p>ようこそ、公式VSレース会場へ♡<br>ただいま開催準備中です。出走受付が始まるまで、もう少しお待ちくださいね。</p></div></section><div class="section"><section class="panel"><div class="num">01 / RACE SCHEDULE</div><h2>次回開催レース</h2><span class="status" id="race-status">接続中</span><p id="race-detail" aria-live="polite">Firebaseから開催情報を取得しています。</p></section><section class="panel"><div class="num">02 / ENTRY</div><h2>出走馬登録</h2><span class="status">受付準備中</span><p>馬データの送信機能は未接続です。現在は大会情報の閲覧のみ対応しています。</p></section><section class="panel"><div class="num">03 / RESULTS</div><h2>レース結果</h2><span class="status" id="result-status">公開準備中</span><p id="result-detail" aria-live="polite">結果データを確認しています。</p></section></div></main><footer class="footer">DERBY FANTASY © VS ARENA<div class="small">※ Firebaseから大会情報を読み取り中。自動レース・馬データ受付は未接続です。</div></footer></div><script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-app.js";
+import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDgdYcIr03txu21GqvK04_ZwK7kffaQxgY",
+  authDomain: "derby-vs-arena.firebaseapp.com",
+  projectId: "derby-vs-arena",
+  storageBucket: "derby-vs-arena.firebasestorage.app",
+  messagingSenderId: "998531404443",
+  appId: "1:998531404443:web:3436b76df88abd4f706c3e"
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const el = id => document.getElementById(id);
+const statusText = { waiting: "開催待機中", open: "出走受付中", closed: "受付終了", running: "レース進行中", finished: "レース終了", completed: "レース終了" };
+function dateLabel(value) {
+  if (!value) return "開催時刻は未設定です。";
+  try {
+    const d = typeof value.toDate === 'function' ? value.toDate() : new Date(value);
+    return Number.isNaN(d.getTime()) ? "開催時刻は未設定です。" : "開催予定：" + new Intl.DateTimeFormat('ja-JP', { timeZone:'Asia/Tokyo', year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' }).format(d);
+  } catch { return "開催時刻は未設定です。"; }
+}
+function update(snapshot) {
+  const races = snapshot.docs.map(d => ({id:d.id, ...d.data()}));
+  const upcoming = races.filter(r => !['finished','completed','cancelled'].includes(r.status));
+  upcoming.sort((a,b) => {
+    const t = v => v?.toMillis?.() ?? (v ? new Date(v).getTime() : Infinity);
+    return t(a.scheduledAt ?? a.startAt) - t(b.scheduledAt ?? b.startAt);
+  });
+  const next = upcoming[0];
+  el('race-status').textContent = next ? (statusText[next.status] || '開催予定') : '開催予定なし';
+  el('race-detail').textContent = next ? dateLabel(next.scheduledAt ?? next.startAt) : '現在、公開されている開催予定はありません。';
+  const completed = races.filter(r => ['finished','completed'].includes(r.status));
+  completed.sort((a,b) => {
+    const t = v => v?.toMillis?.() ?? (v ? new Date(v).getTime() : 0);
+    return t(b.finishedAt ?? b.scheduledAt) - t(a.finishedAt ?? a.scheduledAt);
+  });
+  const latest = completed[0];
+  el('result-status').textContent = latest ? '結果公開中' : '公開準備中';
+  el('result-detail').textContent = latest ? 'レースID：' + latest.id + '（詳細結果表示は今後接続）' : 'まだ公開されたレース結果はありません。';
+}
+onSnapshot(collection(db, 'races'), update, error => {
+  console.error('Firestore read error:', error);
+  el('race-status').textContent = '接続エラー';
+  el('race-detail').textContent = '大会情報を取得できません。Firestoreの設定や通信状態をご確認ください。';
+  el('result-detail').textContent = '結果データを取得できません。';
+});
+</script></body></html>
