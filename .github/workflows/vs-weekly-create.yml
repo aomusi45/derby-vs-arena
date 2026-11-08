@@ -1,0 +1,24 @@
+name: VS ARENA weekly schedule (manual test only)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: vs-arena-weekly-create
+  cancel-in-progress: false
+jobs:
+  create:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --ignore-scripts
+      - run: npm test
+      - name: Preview weekly race documents (no writes unless explicitly enabled)
+        env:
+          FIREBASE_PROJECT_ID: derby-vs-arena
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+          VS_WEEKLY_CREATE_ENABLED: ${{ vars.VS_WEEKLY_CREATE_ENABLED }}
+        run: npm run weekly
