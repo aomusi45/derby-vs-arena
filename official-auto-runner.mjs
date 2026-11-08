@@ -30,7 +30,15 @@ export async function executeInChromium({engineHtml,prepared,timeoutMs=240000,ch
   try {
     const page=await browser.newPage({viewport:{width:1280,height:800}});
     const errors=[];
-    page.on('pageerror',e=>errors.push(String(e.message).slice(0,400)));
+    const failedRequests=[];
+    const consoleErrors=[];
+    page.on('pageerror',e=>errors.push(String(e.stack||e.message).slice(0,700)));
+    page.on('requestfailed',request=>{
+      if(failedRequests.length<12) failedRequests.push({url:request.url().slice(0,220),failure:request.failure()?.errorText||'unknown'});
+    });
+    page.on('console',message=>{
+      if(message.type()==='error' && consoleErrors.length<12) consoleErrors.push(message.text().slice(0,500));
+    });
     let stage='load-html';
     try {
     await page.goto(pathToFileURL(resolve(engineHtml)).href,{waitUntil:'domcontentloaded',timeout:90000});
@@ -75,6 +83,11 @@ export async function executeInChromium({engineHtml,prepared,timeoutMs=240000,ch
       try {
         diagnostic=await page.evaluate(()=>({
           ready:window.__raceReady3D===true,
+          bootStage:window.__df47BootStage??null,
+          bootError:window.__df47BootError??null,
+          threeSource:window.__df46ThreeSource??null,
+          threeLoadFailed:window.__df46ThreeLoadFailed??null,
+          threePresent:!!window.DFV28Three,
           enginePresent:!!window.DFV30SharedRace,
           status:window.DFV30SharedRace?.getStatus?.()??null,
           screen:document.body?.dataset?.gameScreen??null,
@@ -82,7 +95,7 @@ export async function executeInChromium({engineHtml,prepared,timeoutMs=240000,ch
           finishButton:(()=>{const b=document.getElementById('dfNormalFinishButton');return b?{hidden:b.hidden,disabled:b.disabled}:null;})()
         }));
       } catch (inspectionError) {diagnostic={inspectionError:String(inspectionError.message||inspectionError)};}
-      throw new Error(`Ver.92 race stage=${stage}; ${String(error.message||error)}; diagnostics=${JSON.stringify(diagnostic).slice(0,1500)}; pageErrors=${JSON.stringify(errors.slice(-3))}`);
+      throw new Error(`Ver.92 race stage=${stage}; ${String(error.message||error)}; diagnostics=${JSON.stringify(diagnostic).slice(0,1500)}; pageErrors=${JSON.stringify(errors.slice(-3))}; failedRequests=${JSON.stringify(failedRequests.slice(-6))}; consoleErrors=${JSON.stringify(consoleErrors.slice(-6))}`);
     }
   } finally {await browser.close();}
 }
