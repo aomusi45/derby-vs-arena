@@ -1,0 +1,112 @@
+// Trusted GitHub Actions/Node worker: real Ver.92 engine, no substitute physics.
+import {readFile} from 'node:fs/promises';
+import {verifyEntryRoster,verifyResultRoster} from './race-integrity.mjs';
+import {attachVerifiedSnapshotIds} from './result-identity.mjs';
+import {pathToFileURL} from 'node:url';
+import {resolve} from 'node:path';
+import {prepareRaceForExecution,toMillis} from './race-scheduler.mjs';
+import {claimOfficialVsRace} from './firestore-race-claim.mjs';
+import {validateRaceResult,saveOfficialVsResult} from './firestore-result-save.mjs';
+import {inspectAndClose} from './firestore-close-job.mjs';
+import {SUPPORTED_VS_DISTANCES} from './vs-field-adapter.mjs';
+
+export function eligibleToStart(race, now=Date.now()) {
+  return race?.status==='closed' && Number.isInteger(race.registeredCount) && race.registeredCount>0 && race.registeredCount<=18 && Number.isFinite(toMillis(race.scheduledAt)) && toMillis(race.scheduledAt)<=now && !race.runClaim && !race.result;
+}
+export function chooseDueRaces(rows,now=Date.now()) {
+  return rows.filter(r=>eligibleToStart(r,now)).sort((a,b)=>toMillis(a.scheduledAt)-toMillis(b.scheduledAt));
+}
+export async function loadRegisteredEntries(db,raceId){
+  const snap=await db.collection('races').doc(raceId).collection('entries').get();
+  return snap.docs.map(d=>({uid:d.id,...d.data()}));
+}
+
+// A local, isolated Chromium instance runs the ORIGINAL Ver.92 HTML/JS. The DOM
+// result board is the sole source of results; no fabricated winner/time values.
+export async function executeInChromium({engineHtml,prepared,timeoutMs=240000,chromiumFactory}) {
+  if(!engineHtml) throw Error('Ver.92のHTMLがありません');
+  const chromium=chromiumFactory || (await import('playwright')).chromium;
+  const browser=await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--enable-webgl','--disable-dev-shm-usage']});
+  try {
+    const page=await browser.newPage({viewport:{width:1280,height:800}});
+    const errors=[];
+    page.on('pageerror',e=>errors.push(String(e.message).slice(0,400)));
+    await page.goto(pathToFileURL(resolve(engineHtml)).href,{waitUntil:'domcontentloaded',timeout:90000});
+    await page.evaluate(()=>window.__df47Start3D?.());
+    await page.waitForFunction(()=>window.__raceReady3D===true,{timeout:120000});
+    const launched=await page.evaluate(({field,distance,going})=>{
+      const engine=window.DFV30SharedRace;
+      if(!engine || engine.getStatus()?.active) throw Error('VSエンジンが未準備です');
+      const result=engine.start(field,distance,going);
+      if(!result?.ok) throw Error(result?.error||'VS準備失敗');
+      const button=document.getElementById('newspaperRaceStart');
+      if(document.body.dataset.gameScreen!=='newspaper'||!button||button.disabled)throw Error('発走ボタンが利用できません');
+      button.click();
+      return {ok:true,count:result.count};
+    },prepared);
+    if(!launched.ok || launched.count!==prepared.field.length) throw Error('発走要求に失敗しました');
+    await page.waitForFunction(count=>{
+      const status=window.DFV30SharedRace?.getStatus?.();
+      return status?.active && status.race==='finished' && document.body.dataset.gameScreen==='results' && document.querySelectorAll('#resultrows .result-line').length===count;
+    },prepared.field.length,{timeout:timeoutMs});
+    const results=await page.evaluate(()=>[...document.querySelectorAll('#resultrows .result-line')].map((row,i)=>{
+      const txt=selector=>row.querySelector(selector)?.textContent?.trim()||'';
+      const nameNode=row.querySelector('.df28-result-name');
+      const name=nameNode?.childNodes?.[0]?.textContent?.trim()||txt('.df28-result-name').replace(/単勝\s*\d+番人気/,'').trim();
+      const detail=txt('.result-detail');
+      return {rank:Number(txt('.result-rank').replace(/着$/,'')),number:Number(txt('.result-bib')),name,...(i===0?{winningTime:detail}:{marginBehindPrevious:detail})};
+    }));
+    return {results,errors};
+  } finally {await browser.close();}
+}
+
+export async function runAutoRaces({db,engineHtml,apply=false,now=Date.now(),execute=executeInChromium,logger=console}={}) {
+  if(!db)throw Error('Firestore管理者接続がありません');
+  const closing=await inspectAndClose(db,{nowMs:now,apply});
+  const snap=await db.collection('races').get();
+  const due=chooseDueRaces(snap.docs.map(d=>({id:d.id,...d.data()})),now);
+  const reports=[];
+  for(const race of due){
+    let claimed=false;
+    try{
+      if(!SUPPORTED_VS_DISTANCES.includes(race.distance||2400)) {reports.push({raceId:race.id,outcome:'unsupported-distance',distance:race.distance});continue;}
+      const entries=await loadRegisteredEntries(db,race.id);
+      verifyEntryRoster(race,entries);
+      const prepared=prepareRaceForExecution(race,entries,{distance:race.distance||2400,going:race.going||'良'});
+      if(!apply){reports.push({raceId:race.id,outcome:'would-run',count:entries.length});continue;}
+      if(!engineHtml)throw Error('Ver.92 HTMLの場所が未設定です');
+      const claim=await claimOfficialVsRace(db,race.id,{apply:true});
+      if(claim.outcome!=='claimed'){reports.push({raceId:race.id,outcome:claim.outcome});continue;}
+      claimed=true;
+      const output=await execute({engineHtml,prepared});
+      const rawResult={raceId:race.id,source:'DBF-Ver92-result-board',count:entries.length,results:output.results};
+      verifyResultRoster(prepared,rawResult);
+      const result=validateRaceResult(attachVerifiedSnapshotIds(prepared,rawResult,entries));
+      const saved=await saveOfficialVsResult(db,result,{apply:true,completedAt:new Date(),workerId:claim.workerId});
+      reports.push({raceId:race.id,outcome:saved.outcome,count:entries.length});
+    }catch(e){
+      // Never auto-reclaim a possibly started race: the existing 'running'
+      // claim remains for manual investigation instead of risking a rerun.
+      const record={raceId:race.id,outcome:claimed?'claimed-but-failed':'failed-before-claim',error:String(e.message||e)};
+      reports.push(record);logger.error(JSON.stringify(record));
+    }
+  }
+  return {closing,reports};
+}
+
+async function main(){
+  const apply=process.env.VS_AUTO_RUN_ENABLED==='true';
+  if(!process.env.FIREBASE_SERVICE_ACCOUNT_JSON){console.log('Firebase認証情報がないため実行しません');return;}
+  const {initializeApp,cert,getApps}=await import('firebase-admin/app');
+  const {getFirestore}=await import('firebase-admin/firestore');
+  const credentials=JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+  const projectId=process.env.FIREBASE_PROJECT_ID||'derby-vs-arena';
+  if(credentials.project_id!==projectId)throw Error('Firebaseプロジェクトが一致しません');
+  if(!getApps().length)initializeApp({credential:cert(credentials),projectId});
+  const engineHtml=process.env.VS_ENGINE_HTML||'./engine_source.html';
+  if(apply)await readFile(engineHtml); // Fail before making any write.
+  const result=await runAutoRaces({db:getFirestore(),engineHtml,apply});
+  console.log(JSON.stringify({apply,...result},null,2));
+  if(result.reports.some(x=>x.outcome==='claimed-but-failed'||x.outcome==='failed-before-claim'))process.exitCode=1;
+}
+if(process.argv[1] && import.meta.url===pathToFileURL(resolve(process.argv[1])).href)main().catch(e=>{console.error(e);process.exitCode=1;});
