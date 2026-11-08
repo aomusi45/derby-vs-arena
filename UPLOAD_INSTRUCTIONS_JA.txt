@@ -1,0 +1,20 @@
+公式VS ARENA 自動開催ワーカー：アップロード準備版（2026-11-08）
+
+【現状】公開サイト index.html はアップロード済み。今回 index.html を再アップロードしない。
+このフォルダのファイルは GitHub リポジトリのルートへ同じ階層で配置する。
+- package.json とすべての *.mjs と engine_source.html をルートへ
+- .github/workflows/vs-auto-race.yml と vs-weekly-create.yml を同じパスへ
+- 既存の index.html、secretary.webp、Firestore の登録データは削除・上書きしない。
+- 古い vs-auto-close.yml がある場合は併用しない（重複処理の危険）。
+
+【安全状態】
+- 自動レース workflow は手動実行のみ。定期実行なし。
+- 週次作成 workflow も手動実行のみ。定期実行なし。
+- GitHub Variables VS_AUTO_RUN_ENABLED と VS_WEEKLY_CREATE_ENABLED は設定しない、または false のまま。
+- FIREBASE_SERVICE_ACCOUNT_JSON は公開ファイルに入れない。GitHub Actions Secrets にのみ設定する。
+- これらを true にして本番実行するのは、別のテスト用Firebaseで実走・結果保存を検証してから。
+
+【内部検証】node --test *.test.mjs を実施。
+【未検証・未完成】Ver.92の実ブラウザ完走、実Firebase書込み、2200/2500/3200m、ライブ観戦、映像リプレイ、代表馬決定戦の本番接続、称号。
+週次作成の番組に未対応距離が含まれるため、週次作成の書込み有効化は不可。
+この版は「アップロード可能な安全な下準備」であり、本番自動開催完成版ではない。

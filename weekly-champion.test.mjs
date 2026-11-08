@@ -1,0 +1,14 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {tallyWeeklyChampionship as tally} from './weekly-champion.mjs';
+const prizes=[100,50,30,20,10];
+const race=(id,rows)=>({id,status:'finished',result:{results:rows.map((x,i)=>({rank:i+1,number:i+1,snapshotId:x,name:x}))}});
+test('賞金合計で週間代表を選ぶ',()=>{const r=tally([race('a',['A','B']),race('b',['B','A'])],{prizes});assert.equal(r.requiresDecider,true);assert.deepEqual(r.deciderEntrants,['A','B']);});
+test('賞金が同じならG1勝利数で判定',()=>{const r=tally([race('a',['A','B']),race('b',['A','B']),race('c',['B','A'])],{prizes:[50,25,0,0,0]});assert.equal(r.champion.snapshotId,'A');});
+test('着順同数の場合は決定戦へ',()=>{const r=tally([race('a',['A','B']),race('b',['B','A'])],{prizes:[0,0,0,0,0]});assert.equal(r.champion,null);assert.equal(r.requiresDecider,true);});
+test('馬名ではなくsnapshotIdをキーにする',()=>{const r=tally([race('a',['A'])],{prizes});assert.equal(r.standings[0].snapshotId,'A');});
+test('未確定レースは集計しない',()=>{assert.throws(()=>tally([{id:'a',status:'running',result:{results:[]}}],{prizes}),/未確定/);});
+test('公式賞金表なしでは集計しない',()=>{assert.throws(()=>tally([]),/公式賞金表/);});
+test('同じレースを二重集計しない',()=>{assert.throws(()=>tally([race('a',['A']),race('a',['A'])],{prizes}),/重複/);});
+test('出走馬識別子が欠けたら拒否',()=>{assert.throws(()=>tally([{id:'a',status:'finished',result:{results:[{rank:1,number:1,name:'馬'}]}}],{prizes}),/snapshotId/);});
+test('対象がなければ代表なし',()=>{const r=tally([],{prizes});assert.equal(r.champion,null);assert.equal(r.requiresDecider,false);});
