@@ -1,0 +1,35 @@
+name: VS ARENA newspaper preview (read-only)
+on:
+  workflow_dispatch:
+    inputs:
+      race_id:
+        description: 'Existing official race ID, e.g. official_manual_20261109_0915'
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - name: Boot farm and show official newspaper (NO race start / NO writes)
+        env:
+          FIREBASE_PROJECT_ID: derby-vs-arena
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+          VS_ENGINE_HTML: ./engine_source.html
+          VS_PREVIEW_RACE_ID: ${{ inputs.race_id }}
+        run: node official-newspaper-preview.mjs
+      - name: Save screenshots and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: official-newspaper-preview
+          path: newspaper-preview/
+          if-no-files-found: warn
