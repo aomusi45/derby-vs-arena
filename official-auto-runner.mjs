@@ -1,5 +1,5 @@
 // Trusted GitHub Actions/Node worker: real Ver.92 engine, no substitute physics.
-import {readFile} from 'node:fs/promises';
+import {readFile,mkdir} from 'node:fs/promises';
 import {createServer} from 'node:http';
 import {extname,dirname,join,sep} from 'node:path';
 import {verifyEntryRoster,verifyResultRoster} from './race-integrity.mjs';
@@ -68,45 +68,47 @@ export async function executeInChromium({engineHtml,prepared,timeoutMs=240000,ch
     });
     let stage='load-html';
     try {
-    // The proven single-race test loads engine_source.html in an iframe.
-    // Use the same isolated-frame path rather than invoking a private boot function.
-    await page.setContent('<!doctype html><html lang="ja"><body><iframe name="dbfPracticeEngine" title="DBF Ver.92 3D engine" style="width:100%;height:95vh" src="about:blank"></iframe></body></html>');
-    stage='load-practice-iframe';
-    const iframe=page.locator('iframe[name="dbfPracticeEngine"]');
-    await iframe.evaluate((element,url)=>{element.src=url;},localServer.url);
-    const engineFrame=await iframe.elementHandle().then(handle=>handle.contentFrame());
-    if(!engineFrame) throw Error('練習モードのiframeを取得できません');
-    await engineFrame.waitForURL(url=>url.href.startsWith(localServer.url),{timeout:90000});
-    await engineFrame.waitForLoadState('domcontentloaded',{timeout:90000});
-    stage='click-welcome';
-    // The game starts with a welcome overlay. Dismiss it as a player would.
-    const welcome=engineFrame.locator('#dfV42Welcome');
-    if(await welcome.count() && await welcome.isVisible()){
-      await welcome.click({timeout:30000});
-      await welcome.waitFor({state:'hidden',timeout:15000});
-    }
-    stage='click-game-start';
-    const startButton=engineFrame.locator('#derbyOpeningStart');
-    await startButton.waitFor({state:'visible',timeout:90000});
-    await startButton.click({timeout:30000});
-    if(!await engineFrame.evaluate(()=>window.__df46OpeningRequested===true))
-      throw Error('ゲーム開始ボタンの操作が記録されませんでした');
-    stage='wait-engine-ready';
-    await engineFrame.waitForFunction(()=>{
+    // Boot the FULL game, not a standalone 3D engine or the opening button.
+    // The opening UI is worker-only bypassed after the real farm is rendered.
+    await page.goto(localServer.url,{waitUntil:'domcontentloaded',timeout:90000});
+    stage='request-full-game-boot';
+    await page.waitForFunction(()=>typeof window.__df47Start3D==='function',null,{timeout:120000});
+    await page.evaluate(()=>{window.__df46OpeningRequested=true;window.__df47Start3D();});
+    stage='wait-full-game-farm';
+    await page.waitForFunction(()=>{
       if(window.__df47BootError) throw Error(String(window.__df47BootError).slice(0,800));
-      return window.__raceReady3D===true;
+      return window.__raceReady3D===true && window.__derbyFarmEngineReady===true &&
+        document.body.dataset.gameScreen==='farm';
     },null,{timeout:120000});
-    stage='verify-farm-initialized';
-    const farmBoot=await engineFrame.evaluate(()=>({
+    // Farm is an embedded full-game screen; wait for its actual image to paint.
+    stage='wait-visible-farm';
+    await page.waitForFunction(()=>{
+      const frame=document.getElementById('standaloneFarmV62Frame');
+      const img=frame?.contentDocument?.getElementById('exactSceneImage');
+      return !!(img?.complete && img.naturalWidth>0);
+    },null,{timeout:60000});
+    // Only this isolated worker page skips welcome/opening overlays.
+    await page.evaluate(()=>{
+      document.getElementById('dfV42Welcome')?.remove();
+      const opening=document.getElementById('derbyOpening');
+      if(opening){opening.hidden=true;opening.style.pointerEvents='none';}
+      document.body.classList.remove('boot-farm','df-v2-opening-fade');
+    });
+    const farmBoot=await page.evaluate(()=>({
       ready:window.__raceReady3D===true,
-      screen:document.body?.dataset?.gameScreen??null,
+      farmReady:window.__derbyFarmEngineReady===true,
+      screen:document.body.dataset.gameScreen,
+      visible:!!document.getElementById('barnPage')?.getClientRects().length,
+      imageReady:(()=>{const img=document.getElementById('standaloneFarmV62Frame')?.contentDocument?.getElementById('exactSceneImage');return !!(img?.complete&&img.naturalWidth>0);})(),
       engine:typeof window.DFV30SharedRace?.start==='function'
     }));
-    if(!farmBoot.ready || !farmBoot.engine || farmBoot.screen!=='farm'){
-      throw Error(`牧場の初期化が完了していません: ${JSON.stringify(farmBoot)}`);
-    }
+    if(!farmBoot.ready||!farmBoot.farmReady||!farmBoot.visible||!farmBoot.imageReady||!farmBoot.engine||farmBoot.screen!=='farm')
+      throw Error(`ゲーム本体の牧場表示が未完了: ${JSON.stringify(farmBoot)}`);
+    await mkdir('official-vs-diagnostics',{recursive:true});
+    await page.screenshot({path:'official-vs-diagnostics/farm.png'});
+    console.log('[VS] Full game farm visible:',JSON.stringify(farmBoot));
     stage='start-race';
-    const launched=await engineFrame.evaluate(({field,distance,going})=>{
+    const launched=await page.evaluate(({field,distance,going})=>{
       const engine=window.DFV30SharedRace;
       if(!engine || engine.getStatus()?.active) throw Error('VSエンジンが未準備です');
       const result=engine.start(field,distance,going);
@@ -118,7 +120,7 @@ export async function executeInChromium({engineHtml,prepared,timeoutMs=240000,ch
     },prepared);
     if(!launched.ok || launched.count!==prepared.field.length) throw Error('発走要求に失敗しました');
     stage='wait-race-results';
-    await engineFrame.waitForFunction(count=>{
+    await page.waitForFunction(count=>{
       let status=window.DFV30SharedRace?.getStatus?.();
       if(status?.active && status.race==='runout'){
         const finishButton=document.getElementById('dfNormalFinishButton');
@@ -130,7 +132,7 @@ export async function executeInChromium({engineHtml,prepared,timeoutMs=240000,ch
       return status?.active && status.race==='finished' && document.body.dataset.gameScreen==='results' && document.querySelectorAll('#resultrows .result-line').length===count;
     },prepared.field.length,{timeout:timeoutMs});
     stage='read-results';
-    const results=await engineFrame.evaluate(()=>[...document.querySelectorAll('#resultrows .result-line')].map((row,i)=>{
+    const results=await page.evaluate(()=>[...document.querySelectorAll('#resultrows .result-line')].map((row,i)=>{
       const txt=selector=>row.querySelector(selector)?.textContent?.trim()||'';
       const nameNode=row.querySelector('.df28-result-name');
       const name=nameNode?.childNodes?.[0]?.textContent?.trim()||txt('.df28-result-name').replace(/単勝\s*\d+番人気/,'').trim();
@@ -141,7 +143,9 @@ export async function executeInChromium({engineHtml,prepared,timeoutMs=240000,ch
     } catch (error) {
       let diagnostic={};
       try {
-        diagnostic=await (page.frame({name:'dbfPracticeEngine'})||page).evaluate(()=>({
+        await mkdir('official-vs-diagnostics',{recursive:true});
+        await page.screenshot({path:'official-vs-diagnostics/failure.png',timeout:10000}).catch(()=>{});
+        diagnostic=await page.evaluate(()=>({
           ready:window.__raceReady3D===true,
           bootStage:window.__df47BootStage??null,
           bootError:window.__df47BootError??null,

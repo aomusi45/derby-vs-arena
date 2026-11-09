@@ -56,11 +56,13 @@ try{
  // Actual engine initializer. Do not forge __raceReady3D or the game screen.
  await page.waitForFunction(()=>typeof window.__df47Start3D==='function',null,{timeout:90000});
  await page.evaluate(()=>{window.__df46OpeningRequested=true;window.__df47Start3D();});
- await page.waitForFunction(()=>window.__raceReady3D===true||Boolean(window.__df47BootError),null,{timeout:120000});
- const boot=await page.evaluate(()=>({ready:window.__raceReady3D===true,error:window.__df47BootError||null,screen:document.body.dataset.gameScreen,engine:typeof window.DFV30SharedRace?.start==='function'}));
+ await page.waitForFunction(()=>window.__df47BootError|| (window.__raceReady3D===true&&window.__derbyFarmEngineReady===true&&document.body.dataset.gameScreen==='farm'),null,{timeout:120000});
+ await page.waitForFunction(()=>{const img=document.getElementById('standaloneFarmV62Frame')?.contentDocument?.getElementById('exactSceneImage');return !!(img?.complete&&img.naturalWidth>0);},null,{timeout:60000});
+ await page.evaluate(()=>{document.getElementById('dfV42Welcome')?.remove();const opening=document.getElementById('derbyOpening');if(opening){opening.hidden=true;opening.style.pointerEvents='none';}document.body.classList.remove('boot-farm','df-v2-opening-fade');});
+ const boot=await page.evaluate(()=>({ready:window.__raceReady3D===true,error:window.__df47BootError||null,screen:document.body.dataset.gameScreen,engine:typeof window.DFV30SharedRace?.start==='function',farmReady:window.__derbyFarmEngineReady===true,visible:!!document.getElementById('barnPage')?.getClientRects().length}));
  diagnostic.boot=boot;
  await page.screenshot({path:resolve(output,'02-after-farm-boot.png')});
- if(!boot.ready||!boot.engine)throw Error(`牧場3Dエンジン初期化失敗: ${JSON.stringify(boot)}`);
+ if(!boot.ready||!boot.engine||!boot.farmReady||!boot.visible||boot.screen!=='farm')throw Error(`牧場3Dエンジン初期化失敗: ${JSON.stringify(boot)}`);
  diagnostic.stages.push('registered-horses-to-newspaper');
  const newspaper=await page.evaluate(p=>{
   const status=window.DFV30SharedRace?.getStatus?.();
