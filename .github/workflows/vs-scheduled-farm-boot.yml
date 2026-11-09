@@ -1,0 +1,36 @@
+name: VS ARENA scheduled farm boot ONLY
+
+on:
+  workflow_dispatch:
+    inputs:
+      scheduled_at:
+        description: 'JST YYYY-MM-DDTHH:mm:ss+09:00 (start workflow within 5 hours of target)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  farm-boot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - name: Wait for target and boot full DBF farm (NO RACE, NO FIREBASE)
+        env:
+          VS_FARM_BOOT_AT: ${{ inputs.scheduled_at }}
+          VS_ENGINE_HTML: ./engine_source.html
+        run: node official-scheduled-farm-boot.mjs
+      - name: Upload actual farm screenshot and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dbf-farm-boot-evidence
+          path: farm-boot-evidence/
+          if-no-files-found: warn
