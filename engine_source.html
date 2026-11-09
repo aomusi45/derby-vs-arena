@@ -2288,6 +2288,18 @@ body[data-game-screen="race-view"] .shell > .control-strip #dfNormalFinishButton
       },2300);
     }));
   }
+  // Official VS website: direct farm entry without the title button.
+  window.__vsBootFarmDirect=function(){
+    if(requested)return;
+    requested=true;
+    attachFarmLoadListener();
+    document.body.classList.add('barn-mode');
+    document.body.classList.remove('stable-mode','boot-farm');
+    document.body.dataset.gameScreen='farm';
+    if(welcome){welcome.hidden=true;welcome.remove();}
+    const opener=screen();if(opener){opener.hidden=true;opener.style.pointerEvents='none';}
+    showFarmIfReady();
+  };
   window.__derbyMaybeEnterFarm=showFarmIfReady;
   function attachFarmLoadListener(){
     const frame=farmFrame();
