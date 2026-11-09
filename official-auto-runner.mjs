@@ -1,5 +1,7 @@
 // Trusted GitHub Actions/Node worker: real Ver.92 engine, no substitute physics.
 import {readFile} from 'node:fs/promises';
+import {createServer} from 'node:http';
+import {extname,dirname,join,sep} from 'node:path';
 import {verifyEntryRoster,verifyResultRoster} from './race-integrity.mjs';
 import {attachVerifiedSnapshotIds} from './result-identity.mjs';
 import {pathToFileURL} from 'node:url';
@@ -21,12 +23,37 @@ export async function loadRegisteredEntries(db,raceId){
   return snap.docs.map(d=>({uid:d.id,...d.data()}));
 }
 
+// Serve the original HTML over HTTP, as the working practice page does.
+// ES modules and related assets can fail under file:// in headless Chromium.
+async function serveEngineHtml(engineHtml){
+  const entry=resolve(engineHtml);
+  const root=dirname(entry);
+  const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.json':'application/json; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.svg':'image/svg+xml','.glb':'model/gltf-binary','.gltf':'model/gltf+json'};
+  const server=createServer(async(req,res)=>{
+    try{
+      const url=new URL(req.url||'/', 'http://127.0.0.1');
+      const name=decodeURIComponent(url.pathname);
+      const file=name==='/'?entry:resolve(root,'.'+name);
+      if(file!==entry && !file.startsWith(root+sep)){res.writeHead(403);res.end();return;}
+      const body=await readFile(file);
+      res.writeHead(200,{'Content-Type':mime[extname(file).toLowerCase()]||'application/octet-stream','Cache-Control':'no-store'});
+      res.end(body);
+    }catch(err){res.writeHead(404);res.end('Not found');}
+  });
+  await new Promise((ok,fail)=>{server.once('error',fail);server.listen(0,'127.0.0.1',ok);});
+  const address=server.address();
+  return {url:`http://127.0.0.1:${address.port}/`,close:()=>new Promise(ok=>server.close(ok))};
+}
+
 // A local, isolated Chromium instance runs the ORIGINAL Ver.92 HTML/JS. The DOM
 // result board is the sole source of results; no fabricated winner/time values.
 export async function executeInChromium({engineHtml,prepared,timeoutMs=240000,chromiumFactory}) {
   if(!engineHtml) throw Error('Ver.92のHTMLがありません');
   const chromium=chromiumFactory || (await import('playwright')).chromium;
-  const browser=await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--enable-webgl','--disable-dev-shm-usage']});
+  const localServer=await serveEngineHtml(engineHtml);
+  let browser;
+  try {
+  browser=await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--enable-webgl','--disable-dev-shm-usage']});
   try {
     const page=await browser.newPage({viewport:{width:1280,height:800}});
     const errors=[];
@@ -41,7 +68,7 @@ export async function executeInChromium({engineHtml,prepared,timeoutMs=240000,ch
     });
     let stage='load-html';
     try {
-    await page.goto(pathToFileURL(resolve(engineHtml)).href,{waitUntil:'domcontentloaded',timeout:90000});
+    await page.goto(localServer.url,{waitUntil:'domcontentloaded',timeout:90000});
     // Official worker only: bypass the two visual entry screens. Do not
     // change the game's normal opening flow, race rules, or VS unlock checks.
     stage='wait-start-function';
@@ -123,7 +150,8 @@ export async function executeInChromium({engineHtml,prepared,timeoutMs=240000,ch
       } catch (inspectionError) {diagnostic={inspectionError:String(inspectionError.message||inspectionError)};}
       throw new Error(`Ver.92 race stage=${stage}; ${String(error.message||error)}; diagnostics=${JSON.stringify(diagnostic).slice(0,1500)}; pageErrors=${JSON.stringify(errors.slice(-3))}; failedRequests=${JSON.stringify(failedRequests.slice(-6))}; consoleErrors=${JSON.stringify(consoleErrors.slice(-6))}`);
     }
-  } finally {await browser.close();}
+  } finally {await browser?.close();}
+  } finally {await localServer.close();}
 }
 
 export async function runAutoRaces({db,engineHtml,apply=false,now=Date.now(),execute=executeInChromium,logger=console}={}) {
