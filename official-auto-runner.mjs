@@ -68,29 +68,36 @@ export async function executeInChromium({engineHtml,prepared,timeoutMs=240000,ch
     });
     let stage='load-html';
     try {
-    await page.goto(localServer.url,{waitUntil:'domcontentloaded',timeout:90000});
-    // Official worker only: bypass the two visual entry screens. Do not
-    // change the game's normal opening flow, race rules, or VS unlock checks.
-    stage='wait-start-function';
-    await page.waitForFunction(
-      ()=>typeof window.__df47Start3D==='function',
-      null,
-      {timeout:120000}
-    );
-    stage='direct-engine-boot';
-    await page.evaluate(()=>{
-      // This is the same request flag used by the opening button; it is not
-      // a farm-screen or race-ready spoof. main() still performs real setup.
-      window.__df46OpeningRequested=true;
-      window.__df47Start3D();
-    });
+    // The proven single-race test loads engine_source.html in an iframe.
+    // Use the same isolated-frame path rather than invoking a private boot function.
+    await page.setContent('<!doctype html><html lang="ja"><body><iframe name="dbfPracticeEngine" title="DBF Ver.92 3D engine" style="width:100%;height:95vh" src="about:blank"></iframe></body></html>');
+    stage='load-practice-iframe';
+    const iframe=page.locator('iframe[name="dbfPracticeEngine"]');
+    await iframe.evaluate((element,url)=>{element.src=url;},localServer.url);
+    const engineFrame=await iframe.elementHandle().then(handle=>handle.contentFrame());
+    if(!engineFrame) throw Error('練習モードのiframeを取得できません');
+    await engineFrame.waitForURL(url=>url.href.startsWith(localServer.url),{timeout:90000});
+    await engineFrame.waitForLoadState('domcontentloaded',{timeout:90000});
+    stage='click-welcome';
+    // The game starts with a welcome overlay. Dismiss it as a player would.
+    const welcome=engineFrame.locator('#dfV42Welcome');
+    if(await welcome.count() && await welcome.isVisible()){
+      await welcome.click({timeout:30000});
+      await welcome.waitFor({state:'hidden',timeout:15000});
+    }
+    stage='click-game-start';
+    const startButton=engineFrame.locator('#derbyOpeningStart');
+    await startButton.waitFor({state:'visible',timeout:90000});
+    await startButton.click({timeout:30000});
+    if(!await engineFrame.evaluate(()=>window.__df46OpeningRequested===true))
+      throw Error('ゲーム開始ボタンの操作が記録されませんでした');
     stage='wait-engine-ready';
-    await page.waitForFunction(()=>{
+    await engineFrame.waitForFunction(()=>{
       if(window.__df47BootError) throw Error(String(window.__df47BootError).slice(0,800));
       return window.__raceReady3D===true;
     },null,{timeout:120000});
     stage='verify-farm-initialized';
-    const farmBoot=await page.evaluate(()=>({
+    const farmBoot=await engineFrame.evaluate(()=>({
       ready:window.__raceReady3D===true,
       screen:document.body?.dataset?.gameScreen??null,
       engine:typeof window.DFV30SharedRace?.start==='function'
@@ -99,7 +106,7 @@ export async function executeInChromium({engineHtml,prepared,timeoutMs=240000,ch
       throw Error(`牧場の初期化が完了していません: ${JSON.stringify(farmBoot)}`);
     }
     stage='start-race';
-    const launched=await page.evaluate(({field,distance,going})=>{
+    const launched=await engineFrame.evaluate(({field,distance,going})=>{
       const engine=window.DFV30SharedRace;
       if(!engine || engine.getStatus()?.active) throw Error('VSエンジンが未準備です');
       const result=engine.start(field,distance,going);
@@ -111,7 +118,7 @@ export async function executeInChromium({engineHtml,prepared,timeoutMs=240000,ch
     },prepared);
     if(!launched.ok || launched.count!==prepared.field.length) throw Error('発走要求に失敗しました');
     stage='wait-race-results';
-    await page.waitForFunction(count=>{
+    await engineFrame.waitForFunction(count=>{
       let status=window.DFV30SharedRace?.getStatus?.();
       if(status?.active && status.race==='runout'){
         const finishButton=document.getElementById('dfNormalFinishButton');
@@ -123,7 +130,7 @@ export async function executeInChromium({engineHtml,prepared,timeoutMs=240000,ch
       return status?.active && status.race==='finished' && document.body.dataset.gameScreen==='results' && document.querySelectorAll('#resultrows .result-line').length===count;
     },prepared.field.length,{timeout:timeoutMs});
     stage='read-results';
-    const results=await page.evaluate(()=>[...document.querySelectorAll('#resultrows .result-line')].map((row,i)=>{
+    const results=await engineFrame.evaluate(()=>[...document.querySelectorAll('#resultrows .result-line')].map((row,i)=>{
       const txt=selector=>row.querySelector(selector)?.textContent?.trim()||'';
       const nameNode=row.querySelector('.df28-result-name');
       const name=nameNode?.childNodes?.[0]?.textContent?.trim()||txt('.df28-result-name').replace(/単勝\s*\d+番人気/,'').trim();
@@ -134,7 +141,7 @@ export async function executeInChromium({engineHtml,prepared,timeoutMs=240000,ch
     } catch (error) {
       let diagnostic={};
       try {
-        diagnostic=await page.evaluate(()=>({
+        diagnostic=await (page.frame({name:'dbfPracticeEngine'})||page).evaluate(()=>({
           ready:window.__raceReady3D===true,
           bootStage:window.__df47BootStage??null,
           bootError:window.__df47BootError??null,
