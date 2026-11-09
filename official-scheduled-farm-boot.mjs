@@ -69,6 +69,17 @@ export async function bootFarm({htmlPath='./engine_source.html',output='farm-boo
    return f&&f.getBoundingClientRect().width>100&&f.getBoundingClientRect().height>100&&
     getComputedStyle(f).display!=='none'&&(!o||o.hidden)&&!document.getElementById('dfV42Welcome');
   },null,{timeout:30000});
+  // The first visible farm frame can still be covered by DBF's 1850ms
+  // View Transition / star overlay. Wait until that visual effect has ended.
+  await page.waitForFunction(()=>{
+   const stars=document.getElementById('dfV2Sparkles');
+   return !stars?.classList.contains('df-v2-active') &&
+    !document.body.classList.contains('df-v2-opening-fade') &&
+    !document.body.classList.contains('df-v2-fade-out') &&
+    !document.body.classList.contains('df-v2-fade-in');
+  },null,{timeout:15000});
+  await page.waitForTimeout(2500);
+  diagnostics.steps.push('Opening fade and star transition finished');
   diagnostics.farm=await page.evaluate(()=>{
    const f=document.getElementById('standaloneFarmV62Frame'),img=f.contentDocument.getElementById('exactSceneImage');
    return {screen:document.body.dataset.gameScreen,frameVisible:!!f.getBoundingClientRect().width,
