@@ -1,0 +1,188 @@
+
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VS ARENA 単発3D動作テスト</title>
+<style>
+body{background:#09221f;color:#f8e5ad;font-family:system-ui;padding:18px}
+button{padding:12px;margin:8px 0}
+#results{background:#12342f;border:1px solid #b89551;padding:14px;margin:12px 0}
+#results[hidden]{display:none}
+#engine{width:100%;height:70vh;border:1px solid #b89551}
+pre{white-space:pre-wrap;overflow-wrap:anywhere}
+</style>
+</head>
+<body>
+<h1>単発・大阪杯 3D動作テスト</h1>
+<p>テスト専用。公式大会の結果・出走情報は変更しません。3Dエンジン接続の試験であり、自動発走・結果保存は未実装です。</p>
+<button id="load">自分の登録馬を読み込み、3Dエンジンを準備</button>
+<button id="start" disabled>3Dエンジンに出走馬を送る</button>
+<button id="showResult" disabled>ゴール後の結果を表示</button>
+<pre id="msg">未実行</pre>
+<section id="results" hidden>
+<h2>単発テスト・レース結果</h2>
+<div id="resultRows"></div>
+<p>テスト画面のみの表示です。Firestoreへの結果保存は行いません。</p>
+</section>
+<iframe id="engine" title="DBF Ver.92 3Dエンジン" src="about:blank"></iframe>
+
+<script type="module">
+import {initializeApp} from 'https://www.gstatic.com/firebasejs/13.2.0/firebase-app.js';
+import {getFirestore,doc,getDoc} from 'https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js';
+import {getAuth,onAuthStateChanged,signInAnonymously} from 'https://www.gstatic.com/firebasejs/13.2.0/firebase-auth.js';
+
+const cfg={
+ apiKey:'AIzaSyDgdYcIr03txu21GqvK04_ZwK7kffaQxgY',
+ authDomain:'derby-vs-arena.firebaseapp.com',
+ projectId:'derby-vs-arena',
+ appId:'1:998531404443:web:3436b76df88abd4f706c3e'
+};
+const app=initializeApp(cfg);
+const db=getFirestore(app);
+const auth=getAuth(app);
+const id='test_single_osaka_001';
+let entries=[];
+
+const msg=document.getElementById('msg');
+const frame=document.getElementById('engine');
+const start=document.getElementById('start');
+const showResult=document.getElementById('showResult');
+const results=document.getElementById('results');
+const resultRows=document.getElementById('resultRows');
+
+function say(s){msg.textContent=s;}
+
+function currentUser(){
+ return new Promise((resolve,reject)=>{
+  const unsubscribe=onAuthStateChanged(auth,user=>{
+   unsubscribe();
+   resolve(user);
+  },error=>{
+   unsubscribe();
+   reject(error);
+  });
+ });
+}
+
+document.getElementById('load').onclick=async()=>{
+ start.disabled=true;
+ showResult.disabled=true;
+ results.hidden=true;
+ entries=[];
+ try{
+  say('自分の登録馬を読み込み中…');
+  let user=auth.currentUser||await currentUser();
+  if(!user)user=(await signInAnonymously(auth)).user;
+
+  const entry=await getDoc(doc(db,'races',id,'entries',user.uid));
+  if(!entry.exists())throw Error('このログインユーザーの登録馬がありません。出走登録したときと同じログイン状態で開いてください。');
+  const horseJson=entry.data().horseJson;
+  if(typeof horseJson!=='string')throw Error('登録馬JSONがありません');
+
+  entries=[JSON.parse(horseJson)];
+  frame.onload=()=>{
+   say('自分の登録馬1頭を取得。3Dエンジンを読み込みました。準備状態を確認してから送信してください。');
+   start.disabled=false;
+  };
+  frame.src='./engine_source.html';
+  say('自分の登録馬1頭を取得しました。エンジン読み込み中…');
+ }catch(e){
+  say('読み込み失敗: '+(e.message||e));
+ }
+};
+
+const keys=['sp','sta','kick','early','sustain','grit','stability'];
+
+start.onclick=()=>{
+ try{
+  const w=frame.contentWindow;
+  const shared=w.DFV30SharedRace;
+  if(!shared||typeof shared.start!=='function')
+   throw Error('Ver.92のVSブリッジがまだ準備できていません');
+
+  const field=entries.map((d,i)=>{
+   if(!d.horse||!d.raceStats||!d.raceContext||
+      !keys.every(k=>Number.isFinite(Number(d.raceStats[k]?.total))))
+    throw Error('馬データ形式が不正です');
+
+   const c=d.raceContext,h=d.horse;
+   return {
+    id:String(d.sourceHorseId),
+    name:String(d.name||h.name),
+    sex:d.sex||h.sex||'牡',
+    age:Number(d.age||4),
+    coatType:d.coatType||h.coatType||'鹿毛',
+    growth:d.growth||h.growth||'普通',
+    tactic:c.tactic||h.tactic||'先行',
+    speed:Number(d.raceStats.sp.total),
+    sta:Number(d.raceStats.sta.total),
+    kick:Number(d.raceStats.kick.total),
+    early:Number(d.raceStats.early.total),
+    sustain:Number(d.raceStats.sustain.total),
+    grit:Number(d.raceStats.grit.total),
+    stability:Number(d.raceStats.stability.total),
+    bestDistance:Number(c.bestDistance||2000),
+    aptMin:Number(c.aptMin||1200),
+    aptMax:Number(c.aptMax||3000),
+    going:c.goingAptitude||{},
+    health:Number(c.health||90),
+    temperament:Number(c.temperament||85),
+    form:Number(c.form||75),
+    fatigue:Number(c.fatigue||0),
+    isCom:false,
+    number:i+1
+   };
+  });
+
+  const result=shared.start(field,2000,'良');
+  if(result?.ok){
+   showResult.disabled=false;
+   results.hidden=true;
+  }
+  say('VSブリッジ応答: '+JSON.stringify(result)+
+      '\n※ 実際の発走にはゲーム内の新聞画面で「レーススタート」が必要な場合があります。');
+ }catch(e){
+  say('起動準備失敗: '+(e.message||e));
+ }
+};
+
+showResult.onclick=()=>{
+ try{
+  const d=frame.contentDocument;
+  const shared=frame.contentWindow?.DFV30SharedRace;
+  if(!d||!shared)throw Error('3Dエンジンを読み込めません');
+
+  const status=shared.getStatus?.();
+  const finishButton=d.getElementById('dfNormalFinishButton');
+
+  if(status?.race==='runout'){
+   if(!finishButton||finishButton.hidden)
+    throw Error('全馬のゴール後、約3秒待ってから押してください');
+   finishButton.click();
+  }else if(status?.race!=='finished'){
+   throw Error('レースがまだ終了していません。ゴール後に押してください');
+  }
+
+  const lines=[...d.querySelectorAll('#resultrows .result-line')];
+  if(!lines.length)throw Error('結果欄がまだ生成されていません');
+
+  resultRows.replaceChildren();
+  for(const line of lines){
+   const rank=line.querySelector('.result-rank')?.textContent?.trim()||'―';
+   const name=line.querySelector('.df28-result-name')?.childNodes[0]?.textContent?.trim()||'―';
+   const detail=line.querySelector('.result-detail')?.textContent?.trim()||'―';
+   const row=document.createElement('p');
+   row.textContent=`${rank}　${name}　${detail}`;
+   resultRows.appendChild(row);
+  }
+  results.hidden=false;
+  say('ゴール後の結果を表示しました。※ 公式大会への保存はしていません。');
+ }catch(e){
+  say('結果表示待ち: '+(e.message||e));
+ }
+};
+</script>
+</body>
+</html>

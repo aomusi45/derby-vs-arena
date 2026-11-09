@@ -1,5 +1,7 @@
 // Trusted GitHub Actions/Node worker: real Ver.92 engine, no substitute physics.
-import {readFile} from 'node:fs/promises';
+import {readFile,mkdir} from 'node:fs/promises';
+import {createServer} from 'node:http';
+import {extname,dirname,join,sep} from 'node:path';
 import {verifyEntryRoster,verifyResultRoster} from './race-integrity.mjs';
 import {attachVerifiedSnapshotIds} from './result-identity.mjs';
 import {pathToFileURL} from 'node:url';
@@ -21,19 +23,91 @@ export async function loadRegisteredEntries(db,raceId){
   return snap.docs.map(d=>({uid:d.id,...d.data()}));
 }
 
+// Serve the original HTML over HTTP, as the working practice page does.
+// ES modules and related assets can fail under file:// in headless Chromium.
+async function serveEngineHtml(engineHtml){
+  const entry=resolve(engineHtml);
+  const root=dirname(entry);
+  const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.json':'application/json; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.svg':'image/svg+xml','.glb':'model/gltf-binary','.gltf':'model/gltf+json'};
+  const server=createServer(async(req,res)=>{
+    try{
+      const url=new URL(req.url||'/', 'http://127.0.0.1');
+      const name=decodeURIComponent(url.pathname);
+      const file=name==='/'?entry:resolve(root,'.'+name);
+      if(file!==entry && !file.startsWith(root+sep)){res.writeHead(403);res.end();return;}
+      const body=await readFile(file);
+      res.writeHead(200,{'Content-Type':mime[extname(file).toLowerCase()]||'application/octet-stream','Cache-Control':'no-store'});
+      res.end(body);
+    }catch(err){res.writeHead(404);res.end('Not found');}
+  });
+  await new Promise((ok,fail)=>{server.once('error',fail);server.listen(0,'127.0.0.1',ok);});
+  const address=server.address();
+  return {url:`http://127.0.0.1:${address.port}/`,close:()=>new Promise(ok=>server.close(ok))};
+}
+
 // A local, isolated Chromium instance runs the ORIGINAL Ver.92 HTML/JS. The DOM
 // result board is the sole source of results; no fabricated winner/time values.
 export async function executeInChromium({engineHtml,prepared,timeoutMs=240000,chromiumFactory}) {
   if(!engineHtml) throw Error('Ver.92のHTMLがありません');
   const chromium=chromiumFactory || (await import('playwright')).chromium;
-  const browser=await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--enable-webgl','--disable-dev-shm-usage']});
+  const localServer=await serveEngineHtml(engineHtml);
+  let browser;
+  try {
+  browser=await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--enable-webgl','--disable-dev-shm-usage']});
   try {
     const page=await browser.newPage({viewport:{width:1280,height:800}});
     const errors=[];
-    page.on('pageerror',e=>errors.push(String(e.message).slice(0,400)));
-    await page.goto(pathToFileURL(resolve(engineHtml)).href,{waitUntil:'domcontentloaded',timeout:90000});
-    await page.evaluate(()=>window.__df47Start3D?.());
-    await page.waitForFunction(()=>window.__raceReady3D===true,{timeout:120000});
+    const failedRequests=[];
+    const consoleErrors=[];
+    page.on('pageerror',e=>errors.push(String(e.stack||e.message).slice(0,700)));
+    page.on('requestfailed',request=>{
+      if(failedRequests.length<12) failedRequests.push({url:request.url().slice(0,220),failure:request.failure()?.errorText||'unknown'});
+    });
+    page.on('console',message=>{
+      if(message.type()==='error' && consoleErrors.length<12) consoleErrors.push(message.text().slice(0,500));
+    });
+    let stage='load-html';
+    try {
+    // Boot the FULL game, not a standalone 3D engine or the opening button.
+    // The opening UI is worker-only bypassed after the real farm is rendered.
+    await page.goto(localServer.url,{waitUntil:'domcontentloaded',timeout:90000});
+    stage='request-full-game-boot';
+    await page.waitForFunction(()=>typeof window.__df47Start3D==='function',null,{timeout:120000});
+    await page.evaluate(()=>{window.__df46OpeningRequested=true;window.__df47Start3D();});
+    stage='wait-full-game-farm';
+    await page.waitForFunction(()=>{
+      if(window.__df47BootError) throw Error(String(window.__df47BootError).slice(0,800));
+      return window.__raceReady3D===true && window.__derbyFarmEngineReady===true &&
+        document.body.dataset.gameScreen==='farm';
+    },null,{timeout:120000});
+    // Farm is an embedded full-game screen; wait for its actual image to paint.
+    stage='wait-visible-farm';
+    await page.waitForFunction(()=>{
+      const frame=document.getElementById('standaloneFarmV62Frame');
+      const img=frame?.contentDocument?.getElementById('exactSceneImage');
+      return !!(img?.complete && img.naturalWidth>0);
+    },null,{timeout:60000});
+    // Only this isolated worker page skips welcome/opening overlays.
+    await page.evaluate(()=>{
+      document.getElementById('dfV42Welcome')?.remove();
+      const opening=document.getElementById('derbyOpening');
+      if(opening){opening.hidden=true;opening.style.pointerEvents='none';}
+      document.body.classList.remove('boot-farm','df-v2-opening-fade');
+    });
+    const farmBoot=await page.evaluate(()=>({
+      ready:window.__raceReady3D===true,
+      farmReady:window.__derbyFarmEngineReady===true,
+      screen:document.body.dataset.gameScreen,
+      visible:!!document.getElementById('barnPage')?.getClientRects().length,
+      imageReady:(()=>{const img=document.getElementById('standaloneFarmV62Frame')?.contentDocument?.getElementById('exactSceneImage');return !!(img?.complete&&img.naturalWidth>0);})(),
+      engine:typeof window.DFV30SharedRace?.start==='function'
+    }));
+    if(!farmBoot.ready||!farmBoot.farmReady||!farmBoot.visible||!farmBoot.imageReady||!farmBoot.engine||farmBoot.screen!=='farm')
+      throw Error(`ゲーム本体の牧場表示が未完了: ${JSON.stringify(farmBoot)}`);
+    await mkdir('official-vs-diagnostics',{recursive:true});
+    await page.screenshot({path:'official-vs-diagnostics/farm.png'});
+    console.log('[VS] Full game farm visible:',JSON.stringify(farmBoot));
+    stage='start-race';
     const launched=await page.evaluate(({field,distance,going})=>{
       const engine=window.DFV30SharedRace;
       if(!engine || engine.getStatus()?.active) throw Error('VSエンジンが未準備です');
@@ -45,10 +119,19 @@ export async function executeInChromium({engineHtml,prepared,timeoutMs=240000,ch
       return {ok:true,count:result.count};
     },prepared);
     if(!launched.ok || launched.count!==prepared.field.length) throw Error('発走要求に失敗しました');
+    stage='wait-race-results';
     await page.waitForFunction(count=>{
-      const status=window.DFV30SharedRace?.getStatus?.();
+      let status=window.DFV30SharedRace?.getStatus?.();
+      if(status?.active && status.race==='runout'){
+        const finishButton=document.getElementById('dfNormalFinishButton');
+        if(finishButton && !finishButton.hidden && !finishButton.disabled){
+          finishButton.click();
+          status=window.DFV30SharedRace?.getStatus?.();
+        }
+      }
       return status?.active && status.race==='finished' && document.body.dataset.gameScreen==='results' && document.querySelectorAll('#resultrows .result-line').length===count;
     },prepared.field.length,{timeout:timeoutMs});
+    stage='read-results';
     const results=await page.evaluate(()=>[...document.querySelectorAll('#resultrows .result-line')].map((row,i)=>{
       const txt=selector=>row.querySelector(selector)?.textContent?.trim()||'';
       const nameNode=row.querySelector('.df28-result-name');
@@ -57,7 +140,29 @@ export async function executeInChromium({engineHtml,prepared,timeoutMs=240000,ch
       return {rank:Number(txt('.result-rank').replace(/着$/,'')),number:Number(txt('.result-bib')),name,...(i===0?{winningTime:detail}:{marginBehindPrevious:detail})};
     }));
     return {results,errors};
-  } finally {await browser.close();}
+    } catch (error) {
+      let diagnostic={};
+      try {
+        await mkdir('official-vs-diagnostics',{recursive:true});
+        await page.screenshot({path:'official-vs-diagnostics/failure.png',timeout:10000}).catch(()=>{});
+        diagnostic=await page.evaluate(()=>({
+          ready:window.__raceReady3D===true,
+          bootStage:window.__df47BootStage??null,
+          bootError:window.__df47BootError??null,
+          threeSource:window.__df46ThreeSource??null,
+          threeLoadFailed:window.__df46ThreeLoadFailed??null,
+          threePresent:!!window.DFV28Three,
+          enginePresent:!!window.DFV30SharedRace,
+          status:window.DFV30SharedRace?.getStatus?.()??null,
+          screen:document.body?.dataset?.gameScreen??null,
+          resultRows:document.querySelectorAll('#resultrows .result-line').length,
+          finishButton:(()=>{const b=document.getElementById('dfNormalFinishButton');return b?{hidden:b.hidden,disabled:b.disabled}:null;})()
+        }));
+      } catch (inspectionError) {diagnostic={inspectionError:String(inspectionError.message||inspectionError)};}
+      throw new Error(`Ver.92 race stage=${stage}; ${String(error.message||error)}; diagnostics=${JSON.stringify(diagnostic).slice(0,1500)}; pageErrors=${JSON.stringify(errors.slice(-3))}; failedRequests=${JSON.stringify(failedRequests.slice(-6))}; consoleErrors=${JSON.stringify(consoleErrors.slice(-6))}`);
+    }
+  } finally {await browser?.close();}
+  } finally {await localServer.close();}
 }
 
 export async function runAutoRaces({db,engineHtml,apply=false,now=Date.now(),execute=executeInChromium,logger=console}={}) {

@@ -1,27 +1,47 @@
+
 name: VS ARENA automatic race (Ver.92)
+
 on:
+  schedule:
+    - cron: '2-59/5 * * * *'
   workflow_dispatch:
+
 permissions:
   contents: read
+
 concurrency:
   group: vs-arena-official-worker
   cancel-in-progress: false
+
 jobs:
   race:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+
       - run: npm install --ignore-scripts
+
       - run: npx playwright install --with-deps chromium
+
       - run: npm test
+
       - name: Run official Ver.92 races
         env:
           FIREBASE_PROJECT_ID: derby-vs-arena
           FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
-          VS_AUTO_RUN_ENABLED: ${{ vars.VS_AUTO_RUN_ENABLED }}
+          VS_AUTO_RUN_ENABLED: 'true'
           VS_ENGINE_HTML: ./engine_source.html
         run: npm run run
+
+      - name: Save game-screen diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: official-vs-game-screen
+          path: official-vs-diagnostics/
+          if-no-files-found: ignore
