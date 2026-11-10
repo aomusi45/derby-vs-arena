@@ -3216,18 +3216,46 @@ const GOING_TRACK_DRAG=Object.freeze({'良':0,'稍重':.16,'重':.34,'不良':.5
 // This is game balancing, separate from each horse's hidden individual going aptitude.
 // Values are small speed shifts in m/s during the finishing stages, NOT guaranteed winners.
 const GOING_TACTIC_BONUS=Object.freeze({
- '良':Object.freeze({'逃げ':-.16,'先行':-.10,'差し':+.12,'追込':+.16}),
+ '良':Object.freeze({'逃げ':-.040,'先行':-.015,'差し':+.025,'追込':+.030}),
  '稍重':Object.freeze({'逃げ':+.05,'先行':+.06,'差し':-.05,'追込':-.09}),
  '重':Object.freeze({'逃げ':+.18,'先行':+.16,'差し':-.13,'追込':-.20}),
  '不良':Object.freeze({'逃げ':+.30,'先行':+.27,'差し':-.22,'追込':-.29}),
 });
 // Deep closers can still win on bad ground, but their late burst is less effective.
-const GOING_LATE_KICK_FACTOR=Object.freeze({'良':1.10,'稍重':.94,'重':.57,'不良':.40});
+const GOING_LATE_KICK_FACTOR=Object.freeze({'良':.55,'稍重':.94,'重':.57,'不良':.40});
 function goingTacticBonus(h,going=currentGoing){return GOING_TACTIC_BONUS[going]?.[h.tactic]??0;}
 function goingTacticFinishDrive(h,remaining,going=currentGoing){
  const ramp=Math.max(0,Math.min(1,(650-remaining)/650));
  return goingTacticBonus(h,going)*ramp*distanceFactor(h);
 }
+
+// DBF V20: Good-going close-strength running-style equalisation.
+// Only similar original stats + comparable race readiness are eligible;
+// actual velocity, track position, traffic, stamina and crossing time still decide the result.
+// The last ~20% of the race releases pack guidance and preserves a genuine photo finish.
+function df20GoodEqualStrengthDrive(h,order,p){
+ if(currentGoing!=='良'||p<.22||h.finishedAt!==null)return 0;
+ const keys=['sp','sta','kick','early','sustain','grit'];
+ const similar=order.filter(o=>o.finishedAt===null && keys.every(k=>
+    Number.isFinite(Number(h[k]))&&Number.isFinite(Number(o[k]))&&
+    Math.abs(Number(h[k])-Number(o[k]))<.015) &&
+    Math.abs(Number(h.distanceFactor)-Number(o.distanceFactor))<.02 &&
+    Math.abs(Number(h.goingFactor)-Number(o.goingFactor))<.02 &&
+    Math.abs(Number(h.weight)-Number(o.weight))<.51 &&
+    Math.abs(Number(h.raceSp)-Number(o.raceSp))<12 &&
+    Math.abs(Number(h.raceSta)-Number(o.raceSta))<12);
+ if(similar.length<2)return 0;
+ const meanDist=similar.reduce((sum,o)=>sum+o.dist,0)/similar.length;
+ // Equal-strength runners can close real gaps, but are never moved or assigned a rank.
+ const gather=clamp((meanDist-h.dist)*.8,-5,5)*
+    clamp((p-.22)/.10,0,1)*clamp((1-p)/.22,0,1);
+ // Counter the engine's inherited structural closer advantage. The stochastic
+ // finishing variation is fixed per race and operates on physical speed only.
+ const stylePace=({'逃げ':1.75,'先行':2.05,'差し':1.12,'追込':0})[h.tactic]||0;
+ const runNoise=Number.isFinite(h.df20GoodFinishingNoise)?h.df20GoodFinishingNoise:0;
+ return gather+(stylePace+runNoise)*clamp((p-.60)/.15,0,1);
+}
+
 
 let currentGoing='良';
 let currentWeather='晴れ';
@@ -7878,7 +7906,7 @@ function seedRace(){
  h.df132Diag=h.owner?{distance:h.distanceFactor,going:h.goingFactor,
   form:df28RaceFormFactor(h),stability:h.performanceFactor,samples:[]}:null;
  h.df171KickTarget=undefined;h.df171KickStart=undefined;h.df171Gap=0;
- h.variant=0;h.decision=.5+Math.random();h.root.position.copy(trackOffset(0,dfV47VisualLane(h.lane)));h.root.rotation.y=dfV47World?Math.atan2(headingAt(0).x,headingAt(0).z):0;if(h.action)h.action.reset().play();h.mixer.setTime(h.phase*.1)});assignTacticBalanceBonuses(runners);assignTacticPositions(runners);df150RaceEvents=[];runners.forEach(df150Seed);race='idle';$('start').textContent='▶ レース開始';$('start').disabled=false;syncPauseButton();df103Subtitle('出走準備が整いました。レース開始で発走します。');$('result').classList.remove('visible');$('resultrows').innerHTML='';motionStarted=false;updateGateAnimation(1);updateHUD();setCam(true);}
+ h.variant=0;h.df20GoodFinishingNoise=(Math.random()-.5)*1.65;h.decision=.5+Math.random();h.root.position.copy(trackOffset(0,dfV47VisualLane(h.lane)));h.root.rotation.y=dfV47World?Math.atan2(headingAt(0).x,headingAt(0).z):0;if(h.action)h.action.reset().play();h.mixer.setTime(h.phase*.1)});assignTacticBalanceBonuses(runners);assignTacticPositions(runners);df150RaceEvents=[];runners.forEach(df150Seed);race='idle';$('start').textContent='▶ レース開始';$('start').disabled=false;syncPauseButton();df103Subtitle('出走準備が整いました。レース開始で発走します。');$('result').classList.remove('visible');$('resultrows').innerHTML='';motionStarted=false;updateGateAnimation(1);updateHUD();setCam(true);}
 // Ver.171: same ability-scaled late kick, launched earlier when real race gaps
 // demand it. A horse still tires, can be blocked, and is never promised a win.
 function lateCloserBoost(h,remaining){
@@ -8256,6 +8284,7 @@ if(wetHold)target+=wetHold*(h.tactic==='逃げ'||h.tactic==='先行'?1:-.20)*cla
 // The move-up targets during the last stages preserve meaningful late passing.
 if(!Number.isFinite(h.tacticPositionRank))assignTacticPositions(runners);
 target+=tacticPositionDrive(h,order,p);
+target+=df20GoodEqualStrengthDrive(h,order,p);
 // DBF18: small temporary pace choice to open a safe outside passing gap.
 // No direct speed/position teleportation and no change to stored horse stats.
 if(h.df150&&elapsed<h.df150.df18ManeuverUntil)
